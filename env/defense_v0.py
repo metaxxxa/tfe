@@ -25,7 +25,7 @@ from pettingzoo import AECEnv
 from pettingzoo.utils import agent_selector
 from pettingzoo.utils import wrappers
 
-RANGE = 10 # 4 # 10 #4
+RANGE = 4 # 10 #4
 AMMO  = 5
 STEP = -0.1 # reward for making a step
 
@@ -57,28 +57,27 @@ class State:
     
     @property
     def occupied(self):
-        "resturs list of occupied squares"
+        "returns list of occupied squares"
         squares = self.obstacles[:]
         for agent in self.agents.values():
             squares.append((agent.x, agent.y))
         return squares
     
-    def get_observation(self, agent):
+    def get_observation(self, agent): # TODO: improve (include ID)
         # TODO: add visibility information?
         if isinstance(agent, str):
             agent = self.agents[agent]
+        observation = { 'self': agent.to_array(),
+                        'team': [other.to_array() for other in self.agents.values()
+                                    if other.team==agent.team and other != agent],
+                        'others': [other.to_array() for other in self.agents.values()
+                                    if other.team!=agent.team],
+                        'obstacles': self.obstacles
+                    }
+        # squash all values in a single array
+        observation = np.concatenate([np.squeeze(val) for val in observation.values()])
 
-        arr = self.to_array()
-
-        # put own state as first elements of array
-        shift = 2 if agent.team == 'red' else 0
-        start_idx = 2*len(self.obstacles)+shift+5*agent.id
-        stop_idx = start_idx + 5
-        own = arr[start_idx:stop_idx]
-        new_arr = arr.copy()
-        new_arr[:5] = own
-        new_arr[5:5 + start_idx] = arr[:start_idx]
-        return new_arr
+        return observation
 
     def to_array(self):
         """returns state in array-form
@@ -277,10 +276,13 @@ class Environment(AECEnv):
                         mask[self.inv_actions[action]] = 1
         return mask
     
-    def observe(self, agent):
+    def observe_(self, agent):
         action_mask = self.allowed(agent)
         obs = self.state_.get_observation(agent)
         return {'obs': obs, 'action_mask': action_mask}
+    
+    def observe(self, agent):
+        return self.observations[agent]
     
     def reset(self):
         """
@@ -309,7 +311,7 @@ class Environment(AECEnv):
         self.dones = {agent: False for agent in self.agents}
         self.infos = {agent: {} for agent in self.agents}
         #self.state = {agent: self.state_ for agent in self.agents} # clashes with state() method
-        self.observations = {agent: self.observe(agent) for agent in self.agents}
+        self.observations = {agent: self.observe_(agent).copy() for agent in self.agents}
         self.steps = 0
         
         # Our agent_selector utility allows easy cyclic stepping through the agents list.
@@ -349,7 +351,7 @@ class Environment(AECEnv):
             agent.x -= 1
         elif self.actions[action] == 'down':
             agent.x += 1
-        elif self.actions[action] == 'aim0':
+        elif self.actions[action] == 'aim0': # TODO: extend this to arbitray number of opponents
             agent.aim = self.state_.get_other_agent(agent, 0)
         elif self.actions[action] == 'aim1':
             agent.aim = self.state_.get_other_agent(agent, 1)
@@ -367,7 +369,7 @@ class Environment(AECEnv):
                 other_agent.alive = False
         
         ## AEC part:
-        # TODO: quid self._clear_rewards()? This only works because no intermediate rewards
+        # TODO: quid self._clear_rewards()? This only works when no intermediate rewards
         winner = self.state_.winner()
         if winner is not None:
             for agent in self.agents:
@@ -385,15 +387,21 @@ class Environment(AECEnv):
             if not self.agents_[agent].alive:
                 self.dones[agent] = True
         
-        # observe the current state
-        for i in self.agents:
-            self.observations[i] = self.state_.get_observation(agent)
-        
-        # check if max_cycles hasn't been exceeded; if so, set all agents to done
-        self.steps += 1
-        if self.steps >= self.max_cycles:
-            for a in self.agents:
-                self.dones[a] = True
+        # avoid collisons - this is a makeshift solution, effectively giving priority
+        # for certain moves to agents that come earlier in the cycle
+        for agent in self.agents:
+            self.observations[agent]['action_mask'] = self.observe_(agent)['action_mask']
+
+        # To be performed only after complete cycle over all agents:
+        # observe the current state for all agents
+        if self._agent_selector.is_last():
+            self.observations = {agent: self.observe_(agent).copy() for agent in self.agents}
+            
+            # check if max_cycles hasn't been exceeded; if so, set all agents to done
+            self.steps += 1
+            if self.steps >= self.max_cycles:
+                for a in self.agents:
+                    self.dones[a] = True
             
         # selects the next agent.
         self.agent_selection = self._agent_selector.next()
