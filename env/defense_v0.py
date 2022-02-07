@@ -57,28 +57,27 @@ class State:
     
     @property
     def occupied(self):
-        "resturs list of occupied squares"
+        "returns list of occupied squares"
         squares = self.obstacles[:]
         for agent in self.agents.values():
             squares.append((agent.x, agent.y))
         return squares
     
-    def get_observation(self, agent):
+    def get_observation(self, agent): # TODO: improve (include ID)
         # TODO: add visibility information?
         if isinstance(agent, str):
             agent = self.agents[agent]
+        observation = { 'self': agent.to_array(),
+                        'team': [other.to_array() for other in self.agents.values()
+                                    if other.team==agent.team and other != agent],
+                        'others': [other.to_array() for other in self.agents.values()
+                                    if other.team!=agent.team],
+                        'obstacles': self.obstacles
+                    }
+        # squash all values in a single array
+        observation = np.concatenate([np.squeeze(val) for val in observation.values()])
 
-        arr = self.to_array()
-
-        # put own state as first elements of array
-        shift = 2 if agent.team == 'red' else 0
-        start_idx = 2*len(self.obstacles)+shift+5*agent.id
-        stop_idx = start_idx + 5
-        own = arr[start_idx:stop_idx]
-        new_arr = arr.copy()
-        new_arr[:5] = own
-        new_arr[5:5 + start_idx] = arr[:start_idx]
-        return new_arr
+        return observation
 
     def to_array(self):
         """returns state in array-form

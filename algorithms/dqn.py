@@ -138,6 +138,7 @@ class Runner:
             if min([len(self.buffers[agent]) for agent in self.learners]) < self.sample_size:
                 continue
             losses = {agent: [] for agent in self.learners}
+            # learning takes place in this loop
             for _ in range(self.n_batches):
                 for agent in self.learners:
                     batch = random.sample(self.buffers[agent], k=self.sample_size)

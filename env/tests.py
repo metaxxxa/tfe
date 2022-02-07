@@ -1,6 +1,15 @@
 import numpy as np
 import defense_v0
 
+action_names = {0: 'noop',
+                1: 'left',
+                2: 'right',
+                3: 'up',
+                4: 'down',
+                5: 'fire',
+                6: 'aim'
+}
+
 def test01():
     actions = ['noop', 'left', 'right', 'up','down', 'fire', 'aim0']
     env = defense_v0.env(terrain='central_10x10')
@@ -53,14 +62,11 @@ def test04():
     for agent in env.agent_iter():
         obs, reward, done, info = env.last()
         action = actor(obs) if not done else None
-        print(agent, obs, reward, action)
+        print(agent, obs, reward, action_names[action])
         env.step(action)
         env.render()
         print(env.state())
-<<<<<<< Updated upstream
-=======
-        #time.sleep(10)
->>>>>>> Stashed changes
+        input('Press enter to continue ...')
 
 def test05():
     "test max number of steps"
