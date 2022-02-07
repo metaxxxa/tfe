@@ -152,26 +152,29 @@ class Runner:
                     self.agents[agent].sync()
     
     def log(self, indx, losses):
-        avg_rwd, std_rwd = self.eval(self.n_evals)
+        avg_rwd, std_rwd, avg_length = self.eval(self.n_evals)
         for agent in self.learners:
             avg_loss, std_loss = np.mean(losses[agent]), np.std(losses[agent])
             if self.verbose:
                 print(f"{indx} - {agent:11s}: loss = {avg_loss:5.4f}, avg reward = {avg_rwd[agent]:5.4f}")
             self.writers[agent].add_scalar('avg_loss', avg_loss, indx)
             self.writers[agent].add_scalar('avg_reward', avg_rwd[agent], indx)
+            self.writers[agent].add_scalar('avg_length', avg_length, indx)
 
     def eval(self, n):
         rewards = {agent: [] for agent in self.agents}
+        lengths = []
         for _ in range(n):
             episode = self.generate_episode(train=False)
             for agent in episode:
                 rewards[agent].append(np.sum([step.reward for step in episode[agent][:-1]]))
+            lengths.append(len(episode['blue_0']))
         means, stds = {}, {}
         for agent in self.agents:
             means[agent] = np.mean(rewards[agent]) # TODO: better solution (eg. divide by initial reward)
             stds[agent]  = np.std(rewards[agent]) 
 
-        return means, stds
+        return means, stds, np.mean(lengths)
     
     def generate_episode(self, train=True, render=False):
         self.env.reset()
