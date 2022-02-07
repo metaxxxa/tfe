@@ -25,7 +25,7 @@ from pettingzoo import AECEnv
 from pettingzoo.utils import agent_selector
 from pettingzoo.utils import wrappers
 
-RANGE = 10 # 4 # 10 #4
+RANGE = 4 # 10 #4
 AMMO  = 5
 STEP = -0.1 # reward for making a step
 

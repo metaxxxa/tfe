@@ -123,10 +123,11 @@ class Runner:
         s += f"optimizer = {optimizer.__module__.split('.')[-1]}\n"
         s += f"learners = {self.learners}\n"
         s += f'others = {self.others}\n'
-        s += f"identifier = {self.rand_idx}  \n"
+        
         s += f"max range = {self.max_distance} \n"
         s += f"learners = {self.learners}"
         s += f"\nfinal reward = {self.eval(self.n_evals)[0]['blue_0']:4.3f}"
+        s += f"identifier = {self.rand_idx}  \n"
         return s
 
     def run(self, n_iters=10):
@@ -351,7 +352,7 @@ class Args:
         lr = 0.01
         gamma = 0.99
         sync_rate = 50
-        n_iters = 500
+        n_iters = 5000
         buffer_size = 1024
         n_batches = 64
         sample_size = 128
