@@ -314,7 +314,6 @@ def train(args):
     print(runner)
     runner.run(n_iters=int(args.n_iters))
   
-    runner.logger.plot(runner.rand_idx, window=1, text=runner.__str__())
     for agent in runner.learners:
         runner.agents[agent].save(runner.rand_idx)
     print(f'--- Saved with id {runner.rand_idx} ---')
