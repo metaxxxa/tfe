@@ -11,8 +11,12 @@ import torch
 from torch import nn
 from torch import optim
 from torch.nn import functional as F
+device = "cuda" if torch.cuda.is_available() else "cpu" # TODO: activate device usage everywhere
+device = "cpu" # deactivates cuda
 
-from utilities import Logger, build_network
+from torch.utils.tensorboard import SummaryWriter
+
+from utilities import build_network
 
 # hack to allow import of env
 import sys; sys.path.insert(0, '.')
@@ -71,10 +75,8 @@ class Runner:
         # select which agents learn and wich don't (= all others)
         if kwargs['learners'] == 'all':
             self.learners = self.env.agents[:] # ['blue_0'] #   ['blue_0'] #  ['adversary_0'] #
-        elif  kwargs['learners'] == 'blue':
-            self.learners = ['blue_0']
-        elif kwargs['learners'] == 'red':
-            self.learners = ['red_0']
+        else:
+            self.learners = [agent for agent in self.env.agents if agent.startswith(kwargs['learners'])]
         self.others   = [agent for agent in self.env.agents if agent not in self.learners]
         for agent in self.env.agents:
             if agent in self.learners:
@@ -100,10 +102,10 @@ class Runner:
         self.sync_rate = kwargs.get('sync_rate', SYNC_RATE)
         self.n_evals = kwargs.get('n_evals', 20)
         self.verbose = kwargs.get('verbose', True)
-        self.logger = Logger(self.learners, 'step', 'loss', 'reward', 'epsilon', name='dqn')
         self.kwargs = kwargs # store all arguments for printing in __str__
 
         self.rand_idx = random.randint(0, 100000)
+        self.writers = {agent: SummaryWriter(log_dir=f"runs/iac_{str(self.rand_idx)}_{str(agent)}") for agent in self.learners}
     
     def __str__(self):
         kwargs = self.kwargs
@@ -142,17 +144,21 @@ class Runner:
                     loss = self.agents[agent].update(batch)
                     losses[agent].append(loss)
             if indx % LOG_INTERVAL == 0:
-                avg_rwd, std_rwd = self.eval(self.n_evals)
-                for agent in self.learners:
-                    avg_loss, std_loss = np.mean(losses[agent]), np.std(losses[agent])
-                    if self.verbose:
-                        print(f"{indx}/{n_iters} - {agent:11s}: loss = {avg_loss:5.4f}, avg reward = {avg_rwd[agent]:5.4f}")
-                    self.logger.log(agent, indx, (avg_loss, std_loss), (avg_rwd[agent], std_rwd[agent]), self.epsilon)   
+                self.log(indx, losses)
 
             if indx > 0 and indx % self.sync_rate == 0:
                 for agent in self.learners:
                     self.agents[agent].sync()
     
+    def log(self, indx, losses):
+        avg_rwd, std_rwd = self.eval(self.n_evals)
+        for agent in self.learners:
+            avg_loss, std_loss = np.mean(losses[agent]), np.std(losses[agent])
+            if self.verbose:
+                print(f"{indx} - {agent:11s}: loss = {avg_loss:5.4f}, avg reward = {avg_rwd[agent]:5.4f}")
+            self.writers[agent].add_scalar('avg_loss', avg_loss, indx)
+            self.writers[agent].add_scalar('avg_reward', avg_rwd[agent], indx)
+
     def eval(self, n):
         rewards = {agent: [] for agent in self.agents}
         for _ in range(n):
@@ -347,7 +353,7 @@ class Args:
         use_mixer = False
         n_agents = 1
         range=4
-        learners='blue'
+        learners='red' # 'all', 'blue' or red'
 
 if __name__ == '__main__':
     args = Args()

@@ -57,6 +57,10 @@ def test04():
         env.step(action)
         env.render()
         print(env.state())
+<<<<<<< Updated upstream
+=======
+        #time.sleep(10)
+>>>>>>> Stashed changes
 
 def test05():
     "test max number of steps"
