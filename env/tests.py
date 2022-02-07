@@ -10,6 +10,8 @@ action_names = {0: 'noop',
                 6: 'aim'
 }
 
+action_ids = dict([(name, key) for key, name in action_names.items()])
+
 def test01():
     actions = ['noop', 'left', 'right', 'up','down', 'fire', 'aim0']
     env = defense_v0.env(terrain='central_10x10')
@@ -102,6 +104,8 @@ def test06():
     env = defense_v0.env(terrain='flat_5x5_2v2', max_cycles=100)
     #env = Environment(terrain='flat_5x5_2v2', max_cycles=100)
     env.reset()
+
+
     counter = 0
     for agent in env.agent_iter():
         print(counter, agent)
@@ -121,7 +125,33 @@ def test07():
     env = defense_v0.env()
     api_test(env, num_cycles=10, verbose_progress=True)
 
+def test08():
+    """manual control:
+        * arrows to move,
+        * `f` to fire
+        * `a` to aim
+        (press enter after key)"""
+    keys = {'\x1b[D': 'left',
+            '\x1b[C': 'right',
+            '\x1b[A': 'up',
+            '\x1b[B': 'down',
+            'a': 'aim',
+            'f': 'fire'          
+            }
+    env = defense_v0.env(terrain='central_5x5')
+    env.reset()
+    env.render()
+    for agent in env.agent_iter():    
+        obs, reward, done, info = env.last()
+        inp = input('...')
+        print(keys[inp])
+        action = keys[inp] if not done else None
+        print(agent, obs, reward, action)
+        env.step(action_ids[action])
+        env.render()
+        print(env.state())
+
 
 
 if __name__ == '__main__':
-    test04()
+    test08()
