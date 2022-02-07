@@ -105,7 +105,7 @@ class Runner:
         self.kwargs = kwargs # store all arguments for printing in __str__
 
         self.rand_idx = random.randint(0, 100000)
-        self.writers = {agent: SummaryWriter(log_dir=f"runs/iac_{str(self.rand_idx)}_{str(agent)}") for agent in self.learners}
+        self.writers = {agent: SummaryWriter(log_dir=f"runs/dqn_{str(self.rand_idx)}_{str(agent)}") for agent in self.learners}
     
     def __str__(self):
         kwargs = self.kwargs
@@ -188,9 +188,13 @@ class Runner:
                 episode[agent][-1].next_mask = observation['action_mask']
                 episode[agent][-1].reward = reward
                 episode[agent][-1].done = done
-            action = None if done else self.agents[agent].get_action(observation,
-                                                                     epsilon=self.epsilon if train else 0.0)
-            self.env.step(action if not done else None)
+            
+            if done:
+                action = None
+            else:
+                action = self.agents[agent].get_action(observation, epsilon=self.epsilon if train else 0.0)
+            
+            self.env.step(action)
             episode[agent].append(EpisodeStep(observation['obs'], observation['action_mask'], action,
                                               None, None, None, None))
             if train:
@@ -354,7 +358,7 @@ class Args:
         use_mixer = False
         n_agents = 1
         range=4
-        learners='red' # 'all', 'blue' or red'
+        learners='blue' # 'all', 'blue' or red'
 
 if __name__ == '__main__':
     args = Args()

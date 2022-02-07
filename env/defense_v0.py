@@ -387,6 +387,11 @@ class Environment(AECEnv):
             if not self.agents_[agent].alive:
                 self.dones[agent] = True
         
+        # avoid collisons - this is a makeshift solution, effectively giving priority
+        # for certain moves to agents that come earlier in the cycle
+        for agent in self.agents:
+            self.observations[agent]['action_mask'] = self.observe_(agent)['action_mask']
+
         # To be performed only after complete cycle over all agents:
         # observe the current state for all agents
         if self._agent_selector.is_last():

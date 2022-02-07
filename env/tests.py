@@ -64,11 +64,13 @@ def test04():
     for agent in env.agent_iter():
         obs, reward, done, info = env.last()
         action = actor(obs) if not done else None
-        print(agent, obs, reward, action_names[action])
+        print(agent, obs, reward)
+        if action is not None:
+            print(action_names[action])
         env.step(action)
-        env.render()
+        #env.render()
         print(env.state())
-        input('Press enter to continue ...')
+        #input('Press enter to continue ...')
 
 def test05():
     "test max number of steps"
@@ -154,4 +156,4 @@ def test08():
 
 
 if __name__ == '__main__':
-    test08()
+    test04()
