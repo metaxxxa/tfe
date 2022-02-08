@@ -70,7 +70,7 @@ def test04():
         if action is not None:
             print(action_names[action])
         env.step(action)
-        #env.render()
+        env.render()
         print(env.state())
         #input('Press enter to continue ...')
 

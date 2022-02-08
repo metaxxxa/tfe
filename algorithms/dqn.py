@@ -126,7 +126,7 @@ class Runner:
         
         s += f"max range = {self.max_distance} \n"
         s += f"learners = {self.learners}"
-        s += f"\nfinal reward = {self.eval(self.n_evals)[0]['blue_0']:4.3f}"
+        s += f"\nfinal reward = {self.eval(self.n_evals)[0]['blue_0']:4.3f}\n"
         s += f"identifier = {self.rand_idx}  \n"
         return s
 
