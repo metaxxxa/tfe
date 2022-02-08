@@ -5,9 +5,10 @@ Actions:    0 -> noop
             3 -> up
             4 -> down
             5 -> fire
-            6 -> aim
+            6 -> aim0
+            7 -> aim1
 """
-# TODO: assumes equal number of agents on each side (because of `aimX` action)
+
 # TODO: write suite of unittests
 # TODO: verify firing not allowed when blocked
 
@@ -171,7 +172,7 @@ class Agent:
         return agent
 
 class Environment(AECEnv):
-    metadata = {'render.modes': ['human'], "name": "iris_v0"}
+    metadata = {'render.modes': ['human'], "name": "defense_v0"}
 
     def __init__(self, terrain, max_cycles, max_distance) -> None:
         self.terrain = load_terrain(terrain)
@@ -351,10 +352,9 @@ class Environment(AECEnv):
             agent.x -= 1
         elif self.actions[action] == 'down':
             agent.x += 1
-        elif self.actions[action] == 'aim0': # TODO: extend this to arbitray number of opponents
-            agent.aim = self.state_.get_other_agent(agent, 0)
-        elif self.actions[action] == 'aim1':
-            agent.aim = self.state_.get_other_agent(agent, 1)
+        elif self.actions[action][:3] == 'aim':
+            other = int(self.actions[action][3])
+            agent.aim = self.state_.get_other_agent(agent, other)
         elif self.actions[action] == 'fire':
             agent.ammo -= 1
             # determine distance to other agent 
