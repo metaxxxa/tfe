@@ -75,7 +75,7 @@ class State:
                         'obstacles': self.obstacles
                     }
         # squash all values in a single array
-        observation = np.concatenate([np.squeeze(val) for val in observation.values()])
+        observation = np.concatenate([np.squeeze(val).flatten() for val in observation.values()])
 
         return observation
 

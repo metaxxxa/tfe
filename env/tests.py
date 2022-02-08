@@ -14,6 +14,20 @@ action_names = {0: 'noop',
 
 action_ids = dict([(name, key) for key, name in action_names.items()])
 
+def get_action_names(id):
+    moves = {0: 'noop',
+             1: 'left',
+             2: 'right',
+             3: 'up',
+             4: 'down',
+             5: 'fire'}
+    if id < 6:
+        return moves[id]
+    else:
+        return 'aim'
+
+    
+
 def test01():
     actions = ['noop', 'left', 'right', 'up','down', 'fire', 'aim0']
     env = defense_v0.env(terrain='central_10x10')
@@ -61,14 +75,14 @@ def test04():
         action = int(np.random.choice(range(len(pvals)), p=pvals))
         return action
 
-    env = defense_v0.env(terrain='central_5x5')
+    env = defense_v0.env(terrain='central_7x7_2v2')
     env.reset()
     for agent in env.agent_iter():
         obs, reward, done, info = env.last()
         action = actor(obs) if not done else None
         print(agent, obs, reward)
         if action is not None:
-            print(action_names[action])
+            print(get_action_names(action))
         env.step(action)
         env.render()
         print(env.state())
