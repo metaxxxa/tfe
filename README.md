@@ -31,7 +31,7 @@ where the `env.agent_iter()` method iterates over all alive agents. The current 
 ![redered board](img/board_example.png)
 
 
-### Gema description
+### Game description
 Every agent receives an observation that consists of:
 1. An array that represents the true observation and that contains:
     1. the own state: position (x, y), alive status (0 or 1), remaining ammo and who he's aiming at (-1 if None)
@@ -61,5 +61,3 @@ The `algorithms` folder contains a number of deep reinforcement learning algorit
 1. [Proximal Policy Optimization Algorithms](https://arxiv.org/abs/1707.06347)
 1. [QMIX: Monotonic Value Function Factorisation for Deep Multi-Agent Reinforcement Learning](https://arxiv.org/abs/1803.11485)
 1. [PettingZoo: Gym for Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2009.14471)
-
-## TEST
