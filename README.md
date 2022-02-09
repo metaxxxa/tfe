@@ -43,7 +43,7 @@ Every agent receives an observation that consists of:
     1. Firing when not aiming or no ammo left, or if there is no direct line of sight. Other agents or landmarks can block the line of sight; they can thus be used to hide behind.
     1. Any action when not alive
 
-Every agent has 5 + $N_{r|b}$ at his disposal: `noop` (0), `left` (1), `right` (2), `up` (3),`down` (4),  `fire` (5), `aim0` (6 - aim at first opposing agent), ...
+The size of the action space depends on the number of opponents. Every agent has 5 fixed actions at his disposal: `noop` (0), `left` (1), `right` (2), `up` (3),`down` (4) and  `fire` (5). Depending on the number of opponents, he can take $N_{r|b}$ additional aim actions: `aim0` (6 - aim at first opposing agent), `aim1`,  .... Actions are passed be using the action number as argument for `env.step()`.  
 
 Rewards are given when:
 1. a step is made: $R=-0.1$. This induces the agents to end the episode
