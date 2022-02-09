@@ -5,9 +5,10 @@ Actions:    0 -> noop
             3 -> up
             4 -> down
             5 -> fire
-            6 -> aim
+            6 -> aim0
+            7 -> aim1
 """
-# TODO: assumes equal number of agents on each side (because of `aimX` action)
+
 # TODO: write suite of unittests
 # TODO: verify firing not allowed when blocked
 
@@ -75,7 +76,7 @@ class State:
                         'obstacles': self.obstacles
                     }
         # squash all values in a single array
-        observation = np.concatenate([np.squeeze(val) for val in observation.values()])
+        observation = np.concatenate([np.squeeze(val).flatten() for val in observation.values()])
 
         return observation
 
@@ -171,7 +172,7 @@ class Agent:
         return agent
 
 class Environment(AECEnv):
-    metadata = {'render.modes': ['human'], "name": "iris_v0"}
+    metadata = {'render.modes': ['human'], "name": "defense_v0"}
 
     def __init__(self, terrain, max_cycles, max_distance) -> None:
         self.terrain = load_terrain(terrain)
@@ -333,7 +334,14 @@ class Environment(AECEnv):
             # handles stepping an agent which is already done
             # accepts a None action for the one agent, and moves the agent_selection to
             # the next done agent,  or if there are no more done agents, to the next live agent
-            return self._was_done_step(action)
+
+            # below is a hack to jump to correct next agent
+            current_agent = self.agent_selection
+            next_agent = self.agents[(self.agents.index(current_agent) + 1) % len(self.agents)]
+            self._was_done_step(action)
+            self.agent_selection = next_agent
+            return
+
 
         agent = self.agents_[self.agent_selection] # select Agent object
         self._cumulative_rewards[self.agent_selection] = 0 
@@ -351,10 +359,9 @@ class Environment(AECEnv):
             agent.x -= 1
         elif self.actions[action] == 'down':
             agent.x += 1
-        elif self.actions[action] == 'aim0': # TODO: extend this to arbitray number of opponents
-            agent.aim = self.state_.get_other_agent(agent, 0)
-        elif self.actions[action] == 'aim1':
-            agent.aim = self.state_.get_other_agent(agent, 1)
+        elif self.actions[action][:3] == 'aim':
+            other = int(self.actions[action][3])
+            agent.aim = self.state_.get_other_agent(agent, other)
         elif self.actions[action] == 'fire':
             agent.ammo -= 1
             # determine distance to other agent 
@@ -387,6 +394,7 @@ class Environment(AECEnv):
             if not self.agents_[agent].alive:
                 self.dones[agent] = True
         
+        
         # avoid collisons - this is a makeshift solution, effectively giving priority
         # for certain moves to agents that come earlier in the cycle
         for agent in self.agents:
@@ -402,7 +410,10 @@ class Environment(AECEnv):
             if self.steps >= self.max_cycles:
                 for a in self.agents:
                     self.dones[a] = True
-            
+        else:
+            # no rewards are allocated until both players give an action
+            self._clear_rewards()
+
         # selects the next agent.
         self.agent_selection = self._agent_selector.next()
         # Adds .rewards to ._cumulative_rewards
