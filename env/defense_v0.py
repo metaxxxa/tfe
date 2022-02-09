@@ -334,7 +334,14 @@ class Environment(AECEnv):
             # handles stepping an agent which is already done
             # accepts a None action for the one agent, and moves the agent_selection to
             # the next done agent,  or if there are no more done agents, to the next live agent
-            return self._was_done_step(action)
+
+            # below is a hack to jump to correct next agent
+            current_agent = self.agent_selection
+            next_agent = self.agents[(self.agents.index(current_agent) + 1) % len(self.agents)]
+            self._was_done_step(action)
+            self.agent_selection = next_agent
+            return
+
 
         agent = self.agents_[self.agent_selection] # select Agent object
         self._cumulative_rewards[self.agent_selection] = 0 
@@ -387,6 +394,7 @@ class Environment(AECEnv):
             if not self.agents_[agent].alive:
                 self.dones[agent] = True
         
+        
         # avoid collisons - this is a makeshift solution, effectively giving priority
         # for certain moves to agents that come earlier in the cycle
         for agent in self.agents:
@@ -402,7 +410,10 @@ class Environment(AECEnv):
             if self.steps >= self.max_cycles:
                 for a in self.agents:
                     self.dones[a] = True
-            
+        else:
+            # no rewards are allocated until both players give an action
+            self._clear_rewards()
+
         # selects the next agent.
         self.agent_selection = self._agent_selector.next()
         # Adds .rewards to ._cumulative_rewards
