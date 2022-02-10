@@ -1,4 +1,6 @@
-""" Independent Q-learning for DEFENSE (with action mask) """
+""" Independent Q-learning for DEFENSE (with action mask)
+This implementation does NOT use weight sharing (same network for agents)
+"""
 
 import random
 import copy
@@ -16,7 +18,7 @@ device = "cpu" # deactivates cuda
 
 from torch.utils.tensorboard import SummaryWriter
 
-from utilities import build_network
+from utilities import build_network, EpisodeStep
 
 # hack to allow import of env
 import sys; sys.path.insert(0, '.')
@@ -29,23 +31,6 @@ optimizer = optim.Adam
 
 DEFAULT_OBS = np.zeros(8)
 
-# %%
-class EpisodeStep:
-    def __init__(self, observation, mask, action, reward, done, next_obs, next_mask):
-        self.observation = observation
-        self.mask = mask
-        self.action = action
-        self.reward = reward
-        self.done = done
-        self.next_obs = next_obs
-        self.next_mask = next_mask
-        self.counter = 0
-    
-    def __iter__(self):
-        all = [self.observation, self.mask, self.action, self.reward, self.done, self.next_obs, self.next_mask]
-        return iter(all)
-
-# %%
 class Runner:
     """
     Implementation of a simple DQN algorithm.

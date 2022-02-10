@@ -77,6 +77,7 @@ def test04():
 
     env = defense_v0.env(terrain='central_7x7_2v2')
     env.reset()
+    counter = 0
     for agent in env.agent_iter():
         obs, reward, done, info = env.last()
         action = actor(obs) if not done else None
@@ -84,9 +85,10 @@ def test04():
         if action is not None:
             print(get_action_names(action))
         env.step(action)
-        env.render()
-        print(env.state())
+        #env.render()
+        print(counter, env.state())
         #input('Press enter to continue ...')
+        counter += 1
 
 def test05():
     "test max number of steps"
@@ -169,7 +171,32 @@ def test08():
         env.render()
         print(env.state())
 
+def test09():
+    def generate_episode(env):
+        env.reset()
+        episode = {agent: [] for agent in env.agents}
+        done = False
+        for agent in env.agent_iter():
+            #env.render()
+            observation, reward, done, info =  env.last() 
+            
+            action = actor(observation) if not done else None
+            
+            env.step(action)
+            episode[agent].append((observation['obs'], observation['action_mask'], action, reward, done, info))
+        return episode
+    
+    def actor(observation):
+        mask = observation['action_mask']
+        pvals = mask/np.sum(mask)
+        action = int(np.random.choice(range(len(pvals)), p=pvals))
+        return action
 
+    env = defense_v0.env(terrain='central_5x5')
+    env = defense_v0.env(terrain='central_7x7_2v2', max_cycles=1000)
+    episode = generate_episode(env)
+    for agent in episode:
+        print(agent, ' : \n', episode[agent], len(episode[agent]))
 
 if __name__ == '__main__':
-    test04()
+    test09()

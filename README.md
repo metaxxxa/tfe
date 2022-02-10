@@ -49,6 +49,9 @@ Rewards are given when:
 1. a step is made: $R=-0.1$. This induces the agents to end the episode
 1. when all opponents are destroyed: $R=1$ (or $R=-1$ for the losing team)
 
+REMARK: the structure of the game is such that only live agents can still receive a reward at the end of the game. A dead agent thus never receives a reward, even if she has contributed to a potential win. For a correct analysis,
+rewards should thus be evaluated on the team level.
+
 ## Algorithms
 The `algorithms` folder contains a number of deep reinforcement learning algorithms (based on `PyTorch`):
 1. DQN

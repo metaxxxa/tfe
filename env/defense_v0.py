@@ -28,7 +28,7 @@ from pettingzoo.utils import wrappers
 
 RANGE = 4 # 10 #4
 AMMO  = 5
-STEP = -0.1 # reward for making a step
+STEP = -0.01 # reward for making a step
 
 ## --------------------------------------------------------------------------------------------------------------------------
 def env(terrain="flat_5x5", max_cycles=100, max_distance=RANGE):
@@ -383,9 +383,11 @@ class Environment(AECEnv):
                 if self.agents_[agent].team == winner:    # agent's team has won
                     self.rewards[agent] = 1
                     self.dones[agent] = True
+                    self.infos[agent]['winner'] = 'self'
                 else:                                       # # agent's team has lost
                     self.rewards[agent] = -1
                     self.dones[agent] = True
+                    self.infos[agent]['winner'] = 'other'
         else:
             self._cumulative_rewards[self.agent_selection] += STEP
 
@@ -412,7 +414,8 @@ class Environment(AECEnv):
                     self.dones[a] = True
         else:
             # no rewards are allocated until both players give an action
-            self._clear_rewards()
+            #self._clear_rewards()
+            pass # TODO: check this
 
         # selects the next agent.
         self.agent_selection = self._agent_selector.next()
