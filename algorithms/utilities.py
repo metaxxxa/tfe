@@ -6,6 +6,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from torch import nn
 
+
 def flatten(l):
     "flattens a list"
     return [item for sublist in l for item in sublist]
