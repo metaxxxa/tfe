@@ -197,7 +197,7 @@ class QMixRunner(Runner):
                     states = states[:, 0, :]    # => fully cooperative setting, all agents share a common reward function
                     next_states = next_states[:, 0, :]                                          
                     qs = self.mixer(qs.T, states) # = Qtot
-                    next_qs = self.target_mixer(next_qs.T, next_states)                                            
+                    next_qs = self.target_mixer(next_qs.T, next_states).detach()                                           
                     
                 q_target = rewards + self.gamma * (1 - dones) * next_qs
                 loss = F.mse_loss(qs, q_target)
