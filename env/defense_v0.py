@@ -64,14 +64,22 @@ class State:
             squares.append((agent.x, agent.y))
         return squares
     
-    def get_observation(self, agent): # TODO: improve (include ID)
+    def get_observation(self, agent):
+        """ 
+        Computes observation for agent. An observation consists of 
+        * own state: x, y, alive, ammo, aim
+        * state of team mates: dx, dy, alive, ammo, aim
+            where dx, dy is the relative position wrt own position
+        * state of adversaries: dx, dy, alive, ammo, aim
+        * (absolute) position of landmarks
+        """
         # TODO: add visibility information?
         if isinstance(agent, str):
             agent = self.agents[agent]
         observation = { 'self': agent.to_array(),
-                        'team': [other.to_array() for other in self.agents.values()
+                        'team': [other.to_array(agent) for other in self.agents.values()
                                     if other.team==agent.team and other != agent],
-                        'others': [other.to_array() for other in self.agents.values()
+                        'others': [other.to_array(agent) for other in self.agents.values()
                                     if other.team!=agent.team],
                         'obstacles': self.obstacles
                     }
@@ -157,9 +165,18 @@ class Agent:
     def set_position(self, x, y):
         self.x, self.y = x, y
     
-    def to_array(self):
+    def to_array(self, other=None):
+        """Computes Agent representation as numpy array.
+        If `other` is other agent, gives distances x, y 
+        relative to this agent. 
+        """
+        assert other is None or isinstance(other, Agent), f"other should be None or Agent but is {type(agent)}"
+        x0, y0 = 0, 0
+        if other is not None:
+            x0, y0 = other.x, other.y
+
         aim = self.aim.id if self.aim != -1 else -1
-        return np.array([self.x, self.y, int(self.alive), self.ammo, aim])
+        return np.array([self.x-x0, self.y-x0, int(self.alive), self.ammo, aim])
     
     @staticmethod
     def from_array(id, team, arr):
