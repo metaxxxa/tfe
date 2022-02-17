@@ -9,9 +9,6 @@ Actions:    0 -> noop
             7 -> aim1
 """
 
-# TODO: write suite of unittests
-# TODO: verify firing not allowed when blocked
-
 from itertools import product
 import functools
 
@@ -30,6 +27,8 @@ RANGE = 4 # 10 #4
 AMMO  = 5
 STEP = -0.01 # reward for making a step
 
+GRAPH_REFRESH_TIME = 1.0 # visualization speed
+
 ## --------------------------------------------------------------------------------------------------------------------------
 def env(terrain="flat_5x5", max_cycles=100, max_distance=RANGE):
     '''
@@ -43,6 +42,7 @@ def env(terrain="flat_5x5", max_cycles=100, max_distance=RANGE):
     env = wrappers.CaptureStdoutWrapper(env)
     env = wrappers.AssertOutOfBoundsWrapper(env)
     env = wrappers.OrderEnforcingWrapper(env)
+    env.render = env.env.env.env.render # allows direct access to render method of original environment
     return env
 ## --------------------------------------------------------------------------------------------------------------------------
 
@@ -465,8 +465,9 @@ class Environment(AECEnv):
                                                             [self.size-agent1.x-0.5, self.size-agent2.x-0.5],
                                                             alpha=0., color=agent1.team, linewidth=0.5)
             self.ax.add_line(self.lines[(agent1.name, agent2.name)])
+        self.patches['text'] = self.ax.text(0.05, self.size+0.25, '')
     
-    def render(self, mode='human'):
+    def render(self, mode='human', info=''):
         if not hasattr(self, 'ax'):
             self._make_graph()
         for agent in self.agents_.values():
@@ -482,8 +483,10 @@ class Environment(AECEnv):
             else:
                 self.lines[(agent1.name, agent2.name)].set_alpha(0.)
 
+        self.patches['text'].set_text(info)
+
         plt.show()
-        plt.pause(1.0)
+        plt.pause(GRAPH_REFRESH_TIME)
 
 ## --utilities -------------------------------------------------
 

@@ -148,8 +148,6 @@ class Runner:
         episode = {agent: [] for agent in self.env.agents}
         done = False
         for agent in self.env.agent_iter():
-            if render:
-                self.env.render()
             observation, reward, done, _ =  self.env.last() 
             
             # set observation, done and reward as next_obs of previous step
@@ -164,6 +162,8 @@ class Runner:
             self.env.step(action)
             episode[agent].append(EpisodeStep(observation['obs'], observation['action_mask'], action,
                                               None, None, None, None))
+            if render:
+                self.env.render(info=f"{agent}: {action}")
         
         # discard last step for all agents because no usefull information
         # TODO: check validity when agent dies early (eg. 2v2 setting)
