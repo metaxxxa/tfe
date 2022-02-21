@@ -27,7 +27,7 @@ RANGE = 4 # 10 #4
 AMMO  = 5
 STEP = -0.01 # reward for making a step
 
-GRAPH_REFRESH_TIME = 1.0 # visualization speed
+GRAPH_REFRESH_TIME = 0.1 # visualization speed
 
 ## --------------------------------------------------------------------------------------------------------------------------
 def env(terrain="flat_5x5", max_cycles=100, max_distance=RANGE):
