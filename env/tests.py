@@ -193,7 +193,7 @@ def test09():
         return action
 
     env = defense_v0.env(terrain='central_5x5')
-    #env = defense_v0.env(terrain='central_7x7_2v2', max_cycles=1000)
+    env = defense_v0.env(terrain='central_7x7_2v2', max_cycles=1000)
     episode = generate_episode(env)
     for agent in episode:
         print(agent, ' : \n', episode[agent], len(episode[agent]))

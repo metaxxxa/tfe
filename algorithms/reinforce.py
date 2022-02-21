@@ -14,11 +14,12 @@ for connectionist reinforcement learning. Mach Learn 8, 229–256
 """
 
 from typing import Dict
-import random
+import datetime
 
 import numpy as np 
 import torch
 from torch import optim
+from torch.nn import functional as F
 from torch.distributions import Categorical
 from torch.utils.tensorboard import SummaryWriter
 
@@ -48,10 +49,11 @@ class Agent:
     def update(self, batch, rtgs):
         """See Sutton - 13.3 REINFORCE: Monte Carlo Policy Gradient
         + apply logarithm trick"""
-        obs, masks, actions, rewards, dones, _, _ = zip(*batch[:-1]) # skip last elem of batch (contains no useful information)
+        obs, masks, actions, rewards, dones, _, _ = zip(*batch)
         rtgs = torch.from_numpy(np.stack(rtgs)).float()  
         logits = self.policy(torch.from_numpy(np.stack(obs)).float()) # result of policy network are `logits`
-        log_actions = logits[range(len(actions)), actions] # select only the values for the actions taken
+        log_probs = F.log_softmax(logits, dim=1)
+        log_actions = log_probs[range(len(actions)), actions] # select only the values for the actions taken
         loss = -torch.mean(log_actions * rtgs) # a minus because we want gradient ascent !
 
         self.policy.zero_grad()
@@ -80,8 +82,8 @@ class Runner:
     * eval: evaluates current policies
     * log: logs results to tensorboard
     """
-    def __init__(self, terrain='flat_5x5', lr=0.05) -> None:
-        self.env = defense_v0.env(terrain=terrain, max_cycles=20)
+    def __init__(self, terrain='flat_10x10', lr=0.05) -> None:
+        self.env = defense_v0.env(terrain=terrain, max_cycles=30, max_distance=4)
         self.env.reset()
         self.gamma = 0.99
 
@@ -102,13 +104,12 @@ class Runner:
                 self.agents[agent] = Agent(name=agent, net=nets[team], gamma=self.gamma)
             else:
                 self.agents[agent] = RandomAgent(name=agent, n_actions=self.env.action_space(team+'_0').n)
-        
-        
-        self.rand_idx = random.randint(0, 100000)
-        self.writers = {agent: SummaryWriter(log_dir=f"runs/reinforce_{str(self.rand_idx)}_{str(agent)}") for agent in self.learners}
+ 
+        self.id = str(datetime.datetime.now()).replace(" ", "_")
+        self.writers = {agent: SummaryWriter(log_dir=f"runs/reinforce_{str(self.id)}_{str(agent)}") for agent in self.learners}
     
     def __str__(self):
-        s = f"Runner with id {str(self.rand_idx)}"
+        s = f"Runner with id {str(self.id)}"
         return s
 
     def run(self, n_iters=10):
@@ -128,7 +129,7 @@ class Runner:
         results = {agent: {} for agent in self.learners}
         for agent in self.learners:
             episodes = [self.generate_episode()[agent] for _ in range(10)]
-            results[agent]['reward'] = np.mean([np.sum([step.reward for step in episode[:-1]]) for episode in episodes])
+            results[agent]['reward'] = np.mean([np.sum([step.reward for step in episode]) for episode in episodes])
             results[agent]['length'] = np.mean([len(episode) for episode in episodes])
         return results
     
@@ -137,16 +138,19 @@ class Runner:
             avg_loss, std_loss = np.mean(losses[agent]), np.std(losses[agent])
             if indx % PRINT_PERIOD == 0:
                 print(f"{indx} - {agent:11s}: loss = {avg_loss:5.4f}, reward = {results[agent]['reward']:5.4f}, length = {results[agent]['length']:3.2f}")
+            if indx > 0 and indx % 100 == 0:
+                self.generate_episode(render=True)
             self.writers[agent].add_scalar('loss', avg_loss, indx)
             self.writers[agent].add_scalar('reward', results[agent]['reward'], indx)
             self.writers[agent].add_scalar('length', results[agent]['length'], indx)
 
-    def generate_episode(self):
+    def generate_episode(self, render=False):
         self.env.reset()
         episode = {agent: [] for agent in self.env.agents}
         done = False
         for agent in self.env.agent_iter():
             observation, reward, done, _ =  self.env.last() 
+            
             # set observation, done and reward as next_obs of previous step
             if episode[agent]:
                 episode[agent][-1].next_obs = observation['obs']
@@ -159,13 +163,22 @@ class Runner:
             self.env.step(action)
             episode[agent].append(EpisodeStep(observation['obs'], observation['action_mask'], action,
                                               None, None, None, None))
-        return episode
+            if render:
+                info=f"{agent}: {self.env.env.env.env.actions[action]}" if action is not None else ""
+                self.env.render(info=info)
+        
+        # discard last step for all agents because no usefull information
+        # TODO: check validity when agent dies early (eg. 2v2 setting)
+        for agent in episode:
+            episode[agent] = episode[agent][:-1]
+
+        return episode 
      
     def rewards_to_go(self, batch):
         rtgs = {agent : [] for agent in batch}
         for agent in batch:
             R = 0
-            for step in reversed(batch[agent][:-1]):
+            for step in reversed(batch[agent]):
                 if step.done:
                     R = 0
                 R = self.gamma*R +  step.reward
@@ -174,9 +187,12 @@ class Runner:
 
 
 def train():
-    pass
-
-if __name__ == '__main__':
     runner = Runner(terrain='flat_5x5', lr=0.00005)
     print(runner)
-    runner.run(n_iters=5000)
+    runner.run(n_iters=2000)
+    while True:
+        runner.generate_episode(render=True)
+
+
+if __name__ == '__main__':
+    train()
