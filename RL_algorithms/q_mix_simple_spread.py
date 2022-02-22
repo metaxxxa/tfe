@@ -6,6 +6,17 @@ from pettingzoo.mpe import simple_spread_v2
 from collections import deque
 import itertools
 import random
+from torch.utils.tensorboard import SummaryWriter
+
+if torch.cuda.is_available():  
+  dev = "cuda:0" 
+else:  
+  dev = "cpu"  
+device = torch.device(dev) 
+
+#setting up TensorBoard
+
+writer = SummaryWriter()
 
 BUFFER_SIZE = 1000
 REW_BUFFER_SIZE = 100
@@ -24,6 +35,7 @@ env.reset()
 class QMixer(nn.Module):
     def __init__(self, env):
         super().__init__()
+        self.to(device)
         self.agent_nets = dict()
         #params
         dim_L2_agents_net = 32
@@ -38,23 +50,24 @@ class QMixer(nn.Module):
                 nn.Linear(dim_L2_agents_net,32), #nn.GRU(dim_L2_agents_net    ,32),
                 nn.ELU(),
                 nn.Linear(32, nb_outputs)
-            )
+            ).to(device)
 
         mixer_hidden_dim = 32
 
-        self.weightsL1_net = nn.Linear(total_state_dim, mixer_hidden_dim)
-        self.biasesL1_net = nn.Linear(total_state_dim, mixer_hidden_dim)
+        self.weightsL1_net = nn.Linear(total_state_dim, mixer_hidden_dim).to(device)
+        self.biasesL1_net = nn.Linear(total_state_dim, mixer_hidden_dim).to(device)
         
-        self.weightsL2_net = nn.Linear(total_state_dim, mixer_hidden_dim)
+        self.weightsL2_net = nn.Linear(total_state_dim, mixer_hidden_dim).to(device)
         self.biasesL2_net = nn.Sequential(
             nn.Linear(total_state_dim, mixer_hidden_dim),
             nn.ReLU(),
             nn.Linear(mixer_hidden_dim, 1)
-        )
+        ).to(device)
         agent_params = list()
         for net in self.agent_nets.values():
             agent_params += net.parameters()
         self.net_params = agent_params + list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters())  +list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
+        
     
     def forward(self, obs_tot,Qin_t):
         weightsL1 = self.weightsL1_net(obs_tot)
@@ -70,7 +83,7 @@ class QMixer(nn.Module):
         return Qtot
         
     def get_Q_values(self, agent, obs):
-        obs_t = torch.as_tensor(obs, dtype=torch.float32)
+        obs_t = torch.as_tensor(obs, dtype=torch.float32).to(device)
         q_values = self.agent_nets[agent](obs_t.unsqueeze(0))
         return q_values
 
@@ -83,6 +96,8 @@ class QMixer(nn.Module):
     def act(self, agent, obs):
         action, _ = self.get_Q_max(self.get_Q_values(agent, obs))
         return action
+    
+    
 
 
 
@@ -173,6 +188,7 @@ for step in itertools.count():
     if one_agent_done:
         obs = env.reset()
         rew_buffer.append(episode_reward)
+        writer.add_scalar("Reward", episode_reward,step  )
         episode_reward = 0.0
         one_agent_done = 0
         for agent in env.agents:
@@ -203,8 +219,8 @@ for step in itertools.count():
         new_obs = np.array([])
         for agent in env.agents:
             obs = np.concatenate((obs, t[agent][0]))
-            q_max_online = np.append(q_max_online, online_net.get_Q_max(online_net.get_Q_values(agent, t[agent][0]))[1].detach())
-            q_max_target = np.append(q_max_target, target_net.get_Q_max(target_net.get_Q_values(agent, t[agent][4]))[1].detach())
+            q_max_online = np.append(q_max_online, online_net.get_Q_max(online_net.get_Q_values(agent, t[agent][0]))[1].cpu().detach())
+            q_max_target = np.append(q_max_target, target_net.get_Q_max(target_net.get_Q_values(agent, t[agent][4]))[1].cpu().detach())
             acts = np.append(acts, t[agent][1])
             rews = np.append(rews, t[agent][2])
             done = np.append(done, t[agent][3])
@@ -216,13 +232,13 @@ for step in itertools.count():
         rewards = np.append(rewards, [rews], axis = 0)
         dones = np.append(dones, [done], axis = 0)
         new_obses_t = np.append(new_obses_t, [new_obs], axis = 0)
-    Q_ins_online_t = torch.as_tensor(Q_ins_online, dtype=torch.float32)
-    Q_ins_target_t = torch.as_tensor(Q_ins_target, dtype=torch.float32)
-    obses_t = torch.as_tensor(obses_t, dtype=torch.float32)
-    actions_t = torch.as_tensor(actions, dtype=torch.int64).unsqueeze(-1)
-    rewards_t = torch.as_tensor(rewards, dtype=torch.float32).unsqueeze(-1)
-    dones_t = torch.as_tensor(dones, dtype=torch.float32).unsqueeze(-1)
-    new_obses_t = torch.as_tensor(new_obses_t, dtype=torch.float32)
+    Q_ins_online_t = torch.as_tensor(Q_ins_online, dtype=torch.float32, device=device)
+    Q_ins_target_t = torch.as_tensor(Q_ins_target, dtype=torch.float32, device=device)
+    obses_t = torch.as_tensor(obses_t, dtype=torch.float32, device=device)
+    actions_t = torch.as_tensor(actions, dtype=torch.int64, device=device).unsqueeze(-1)
+    rewards_t = torch.as_tensor(rewards, dtype=torch.float32, device=device).unsqueeze(-1)
+    dones_t = torch.as_tensor(dones, dtype=torch.float32, device=device).unsqueeze(-1)
+    new_obses_t = torch.as_tensor(new_obses_t, dtype=torch.float32, device=device)
     
     #compute reward for all agents
     rewards_t = rewards_t.sum(1)
@@ -241,6 +257,7 @@ for step in itertools.count():
     loss = error**2
     loss = loss.sum()
     loss_buffer.append(loss.detach().item())
+    writer.add_scalar("Loss", loss, step)
     #action_q_values = torch.gather(input=q_values, dim=1, index=actions_t)
 
 
@@ -259,6 +276,6 @@ for step in itertools.count():
         print('\n Step', step )
         print('Avg Rew', np.mean(rew_buffer))
         print('Avg Loss', np.mean(loss_buffer))
-
+    writer.close()
 
 ###
