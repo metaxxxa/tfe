@@ -18,6 +18,8 @@ device = torch.device(dev)
 
 writer = SummaryWriter()
 
+#parameters
+
 BUFFER_SIZE = 1000
 REW_BUFFER_SIZE = 100
 LEARNING_RATE = 1e-4
@@ -38,18 +40,21 @@ class QMixer(nn.Module):
         self.to(device)
         self.agent_nets = dict()
         #params
+
+        dim_L1_agents_net = 32
         dim_L2_agents_net = 32
+
         total_state_dim = 0
         for agent in env.agents:
             nb_inputs = np.prod(env.observation_space(agent).shape)
             nb_outputs = env.action_space(agent).n
             total_state_dim += nb_inputs
             self.agent_nets[agent] = nn.Sequential(
-                nn.Linear(nb_inputs, dim_L2_agents_net),
+                nn.Linear(nb_inputs, dim_L1_agents_net),
                 nn.ELU(),
-                nn.Linear(dim_L2_agents_net,32), #nn.GRU(dim_L2_agents_net    ,32),
+                nn.Linear(dim_L1_agents_net,dim_L2_agents_net), #nn.GRU(dim_L2_agents_net    ,32),
                 nn.ELU(),
-                nn.Linear(32, nb_outputs)
+                nn.Linear(dim_L2_agents_net, nb_outputs)
             ).to(device)
 
         mixer_hidden_dim = 32
@@ -70,9 +75,9 @@ class QMixer(nn.Module):
         
     
     def forward(self, obs_tot,Qin_t):
-        weightsL1 = self.weightsL1_net(obs_tot)
+        weightsL1 = torch.abs(self.weightsL1_net(obs_tot)) # abs: monotonicity constraint
         biasesL1 = self.biasesL1_net(obs_tot)
-        weightsL2 = self.weightsL2_net(obs_tot)
+        weightsL2 = torch.abs(self.weightsL2_net(obs_tot))
         biasesL2 = self.biasesL2_net(obs_tot)
         l1 = weightsL1*Qin_t.sum(1)[:,None] + biasesL1
         l1 = nn.ELU(l1).alpha
@@ -124,12 +129,10 @@ env.reset()
 one_agent_done = 0
 
 observation_prev = dict()
-reward_prev = dict()
 observation = dict()
-reward = dict()
 episode_reward = 0.0
 for agent in env.agents:
-    observation_prev[agent], reward_prev[agent], done, info = env.last()
+    observation_prev[agent], _, _, _ = env.last()
 for _ in range(MIN_BUFFER_LENGTH):
     
     transition = dict()
@@ -139,12 +142,10 @@ for _ in range(MIN_BUFFER_LENGTH):
             env.step(None)
         else:
             env.step(action)
-        observation[agent], reward[agent], done, info = env.last()
-        rew = reward[agent] - reward_prev[agent]
-        episode_reward += rew
-        transition[agent] = (observation_prev[agent], action,rew,done,observation[agent])
+        observation[agent], reward, done, info = env.last()
+        episode_reward += reward
+        transition[agent] = (observation_prev[agent], action,reward,done,observation[agent])
         observation_prev[agent] = observation[agent]
-        reward_prev[agent] = reward[agent]
         if done:
             one_agent_done = 1 #if one agent is done, all have to stop
     if one_agent_done:
@@ -153,7 +154,7 @@ for _ in range(MIN_BUFFER_LENGTH):
         episode_reward = 0.0
         one_agent_done = 0
         for agent in env.agents:
-            observation_prev[agent], reward_prev[agent], done, info = env.last()
+            observation_prev[agent], _, _, _ = env.last()
     
     replay_buffer.append(transition)
 
@@ -162,7 +163,7 @@ for _ in range(MIN_BUFFER_LENGTH):
 env.reset()
 episode_reward = 0.0
 for agent in env.agents:
-    observation_prev[agent], reward_prev[agent], done, info = env.last()
+    observation_prev[agent], _, _, _ = env.last()
 
 for step in itertools.count():
     epsilon = np.interp(step, [0, EPSILON_DECAY], [EPSILON_START, EPSILON_END])
@@ -177,12 +178,10 @@ for step in itertools.count():
             env.step(None)
         else:
             env.step(action)
-        observation[agent], reward[agent], done, info = env.last()
-        rew = reward[agent] - reward_prev[agent]
-        episode_reward += rew
-        transition[agent] = (observation_prev[agent], action,rew,done,observation[agent])
+        observation[agent], reward, done, info = env.last()
+        episode_reward += reward
+        transition[agent] = (observation_prev[agent], action,reward,done,observation[agent])
         observation_prev[agent] = observation[agent]
-        reward_prev[agent] = reward[agent]
         if done:
             one_agent_done = 1 #if one agent is done, all have to stop
     if one_agent_done:
@@ -192,7 +191,7 @@ for step in itertools.count():
         episode_reward = 0.0
         one_agent_done = 0
         for agent in env.agents:
-            observation_prev[agent], reward_prev[agent], done, info = env.last()
+            observation_prev[agent], _, _, _ = env.last()
     
     replay_buffer.append(transition)
     
@@ -253,12 +252,12 @@ for step in itertools.count():
 ########### busy
     # loss 
     error = y_tot + (-1)*Qtot_online
-    #q_values = online_net(obses_t, Q_ins_online_t)
+    
     loss = error**2
     loss = loss.sum()
     loss_buffer.append(loss.detach().item())
     writer.add_scalar("Loss", loss, step)
-    #action_q_values = torch.gather(input=q_values, dim=1, index=actions_t)
+    
 
 
     # gradient descent
@@ -276,6 +275,6 @@ for step in itertools.count():
         print('\n Step', step )
         print('Avg Rew', np.mean(rew_buffer))
         print('Avg Loss', np.mean(loss_buffer))
-    writer.close()
+writer.close() 
 
 ###
