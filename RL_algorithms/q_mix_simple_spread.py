@@ -21,15 +21,15 @@ writer = SummaryWriter()
 #parameters
 
 BUFFER_SIZE = 1000
-REW_BUFFER_SIZE = 100
-LEARNING_RATE = 1e-4
+REW_BUFFER_SIZE = 1000
+LEARNING_RATE = 1e-5
 MIN_BUFFER_LENGTH = 100
 BATCH_SIZE = 100
 GAMMA = 0.99
 EPSILON_START = 1
 EPSILON_END = 0.02
-EPSILON_DECAY = 10000
-SYNC_TARGET_FRAMES = 1000
+EPSILON_DECAY = 1000
+SYNC_TARGET_FRAMES = 100
 
 env = simple_spread_v2.env(N=3, local_ratio=0.5, max_cycles=25, continuous_actions=False)
 env.reset()
@@ -58,15 +58,15 @@ class QMixer(nn.Module):
             ).to(device)
 
         mixer_hidden_dim = 32
-
+        mixer_hidden_dim2 = 32
         self.weightsL1_net = nn.Linear(total_state_dim, mixer_hidden_dim).to(device)
         self.biasesL1_net = nn.Linear(total_state_dim, mixer_hidden_dim).to(device)
         
-        self.weightsL2_net = nn.Linear(total_state_dim, mixer_hidden_dim).to(device)
+        self.weightsL2_net = nn.Linear(total_state_dim, mixer_hidden_dim2).to(device)
         self.biasesL2_net = nn.Sequential(
             nn.Linear(total_state_dim, mixer_hidden_dim),
             nn.ReLU(),
-            nn.Linear(mixer_hidden_dim, 1)
+            nn.Linear(mixer_hidden_dim, mixer_hidden_dim2)
         ).to(device)
         agent_params = list()
         for net in self.agent_nets.values():
@@ -81,9 +81,8 @@ class QMixer(nn.Module):
         biasesL2 = self.biasesL2_net(obs_tot)
         l1 = weightsL1*Qin_t.sum(1)[:,None] + biasesL1
         l1 = nn.ELU(l1).alpha
-        Qtot = weightsL2*l1.sum(1)[:,None]
-        Qint = Qtot.sum(1)
-        Qtot = Qtot.sum(1).unsqueeze(-1) + biasesL2
+        Qtot = weightsL2*l1.sum(1)[:,None]+ biasesL2
+        Qtot = Qtot.sum(1).unsqueeze(-1) 
         
         return Qtot
         
@@ -201,13 +200,13 @@ for step in itertools.count():
     #gradient step
 
     transitions = random.sample(replay_buffer, BATCH_SIZE)
-    obses_t = np.empty((0,len(env.agents)*np.prod(env.observation_space(agent).shape)), np.float64)
+    obses = np.empty((0,len(env.agents)*np.prod(env.observation_space(agent).shape)), np.float64)
     actions = np.empty((0,len(env.agents)), np.float64)
     Q_ins_target = np.empty((0,len(env.agents)), np.float64)
     Q_ins_online = np.empty((0,len(env.agents)), np.float64)
     rewards = np.empty((0,len(env.agents)), np.float64)
     dones = np.empty((0,len(env.agents)), np.float64)
-    new_obses_t = np.empty((0,len(env.agents)*np.prod(env.observation_space(agent).shape)), np.float64)
+    new_obses = np.empty((0,len(env.agents)*np.prod(env.observation_space(agent).shape)), np.float64)
     for t in transitions:
         obs = np.array([])
         q_max_online = np.array([])
@@ -224,20 +223,22 @@ for step in itertools.count():
             rews = np.append(rews, t[agent][2])
             done = np.append(done, t[agent][3])
             new_obs = np.concatenate((new_obs, t[agent][4]))
-        obses_t = np.append(obses_t, [obs], axis = 0)
+        obses = np.append(obses, [obs], axis = 0)
         Q_ins_online = np.append(Q_ins_online, [q_max_online], axis = 0)
         Q_ins_target = np.append(Q_ins_target, [q_max_target], axis = 0)
         actions = np.append(actions, [acts], axis = 0)
         rewards = np.append(rewards, [rews], axis = 0)
         dones = np.append(dones, [done], axis = 0)
-        new_obses_t = np.append(new_obses_t, [new_obs], axis = 0)
+        new_obses = np.append(new_obses, [new_obs], axis = 0)
     Q_ins_online_t = torch.as_tensor(Q_ins_online, dtype=torch.float32, device=device)
     Q_ins_target_t = torch.as_tensor(Q_ins_target, dtype=torch.float32, device=device)
-    obses_t = torch.as_tensor(obses_t, dtype=torch.float32, device=device)
+
+
+    obses_t = torch.as_tensor(obses, dtype=torch.float32, device=device)
     actions_t = torch.as_tensor(actions, dtype=torch.int64, device=device).unsqueeze(-1)
     rewards_t = torch.as_tensor(rewards, dtype=torch.float32, device=device).unsqueeze(-1)
     dones_t = torch.as_tensor(dones, dtype=torch.float32, device=device).unsqueeze(-1)
-    new_obses_t = torch.as_tensor(new_obses_t, dtype=torch.float32, device=device)
+    new_obses_t = torch.as_tensor(new_obses, dtype=torch.float32, device=device)
     
     #compute reward for all agents
     rewards_t = rewards_t.sum(1)

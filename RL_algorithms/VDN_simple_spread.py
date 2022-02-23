@@ -20,16 +20,16 @@ writer = SummaryWriter()
 
 #parameters
 
-BUFFER_SIZE = 1000
+BUFFER_SIZE = 100
 REW_BUFFER_SIZE = 100
 LEARNING_RATE = 1e-4
 MIN_BUFFER_LENGTH = 100
-BATCH_SIZE = 100
+BATCH_SIZE = 30
 GAMMA = 0.99
 EPSILON_START = 1
 EPSILON_END = 0.02
-EPSILON_DECAY = 10000
-SYNC_TARGET_FRAMES = 1000
+EPSILON_DECAY = 1000
+SYNC_TARGET_FRAMES = 10
 
 env = simple_spread_v2.env(N=3, local_ratio=0.5, max_cycles=25, continuous_actions=False)
 env.reset()
