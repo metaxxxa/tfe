@@ -103,7 +103,7 @@ class Runner:
             if agent in self.learners:
                 self.agents[agent] = Agent(name=agent, net=nets[team], gamma=self.gamma)
             else:
-                self.agents[agent] = RandomAgent(name=agent, n_actions=self.env.action_space(team+'_0').n)
+                self.agents[agent] = RandomAgent(name=agent, n_actions=self.env.action_space(agent).n)
  
         self.id = str(datetime.datetime.now()).replace(" ", "_")
         self.writers = {agent: SummaryWriter(log_dir=f"runs/reinforce_{str(self.id)}_{str(agent)}") for agent in self.learners}
