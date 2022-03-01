@@ -25,13 +25,13 @@ REW_BUFFER_SIZE = 1000
 LEARNING_RATE = 1e-5
 MIN_BUFFER_LENGTH = 100
 BATCH_SIZE = 100
-GAMMA = 0.99
+GAMMA = 0.9
 EPSILON_START = 1
 EPSILON_END = 0.02
 EPSILON_DECAY = 1000
 SYNC_TARGET_FRAMES = 100
 
-env = simple_spread_v2.env(N=3, local_ratio=0.5, max_cycles=25, continuous_actions=False)
+env = simple_spread_v2.env(N=2, local_ratio=0.5, max_cycles=25, continuous_actions=False)
 env.reset()
 
 class QMixer(nn.Module):
