@@ -36,6 +36,7 @@ class Args:
         self.VISUALIZE_WHEN_LEARNED = True
         
         #agent network parameters
+        self.COMMON_AGENTS_NETWORK = True
         self.dim_L1_agents_net = 32
         self.dim_L2_agents_net = 32
         #mixing network parameters
@@ -61,9 +62,15 @@ class QMixer(nn.Module):
         #params
         self.args = args
         total_state_dim = 0
-        for agent in env.agents:
-            self.agent_nets[agent] = AgentRNN(args)
-            total_state_dim += np.prod(env.observation_space(agent).shape)
+        if self.args.COMMON_AGENTS_NETWORK:
+            agents_net = AgentRNN(self.args)
+            for agent in env.agents:
+                self.agent_nets[agent] = agents_net
+                total_state_dim += np.prod(env.observation_space(agent).shape)
+        else:
+            for agent in env.agents:
+                self.agent_nets[agent] = AgentRNN(args)
+                total_state_dim += np.prod(env.observation_space(agent).shape)
         
         self.weightsL1_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim*self.args.n_agents).to(device)
         self.biasesL1_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim).to(device)
@@ -196,7 +203,9 @@ class runner_QMix:
                 observation[agent], reward, done, info = self.env.last()
                 episode_reward += reward
                 transition[agent] = (observation_prev[agent], action,reward,done,observation[agent])
-                observation_prq_max_onlindone = 1 #if one agent is done, all have to stop
+                observation_prev[agent] = observation[agent]
+                if done:
+                    one_agent_done = 1 #if one agent is done, all have to stop
             if one_agent_done:
                 obs = self.env.reset()
                 self.rew_buffer.append(episode_reward)
