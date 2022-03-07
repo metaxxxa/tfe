@@ -240,7 +240,7 @@ class runner_QMix:
                     actions_t[transition_nb][agent_nb] = t[agent][1]
                     rewards_t[transition_nb][agent_nb] = t[agent][2]
                     dones_t[transition_nb][agent_nb] = t[agent][3]
-                    new_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4], dtype=torch.float32, device=device)
+                    new_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4], dtype=torch.float32, device=device).detach()
 
                     Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0]).squeeze(0), 0,torch.tensor([t[agent][1]]).to(device))
                     Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4]))[1]
