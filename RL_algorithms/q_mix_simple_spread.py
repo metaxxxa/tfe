@@ -22,7 +22,7 @@ writer = SummaryWriter()
 class Args:
     def __init__(self, env):
             
-        self.BUFFER_SIZE = 10000
+        self.BUFFER_SIZE = 1000
         self.REW_BUFFER_SIZE = 100
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 1000
@@ -193,9 +193,7 @@ class runner_QMix:
                 observation[agent], reward, done, info = self.env.last()
                 episode_reward += reward
                 transition[agent] = (observation_prev[agent], action,reward,done,observation[agent])
-                observation_prev[agent] = observation[agent]
-                if done:
-                    one_agent_done = 1 #if one agent is done, all have to stop
+                observation_prq_max_onlindone = 1 #if one agent is done, all have to stop
             if one_agent_done:
                 obs = self.env.reset()
                 self.rew_buffer.append(episode_reward)
@@ -208,9 +206,7 @@ class runner_QMix:
             self.replay_buffer.append(transition)
             
 
-
-        ########## checkpoint
-            #gradient step
+            #gradient stept[agent][1]
 
             transitions = random.sample(self.replay_buffer, args.BATCH_SIZE)
             obses = np.empty((0,len(self.env.agents)*np.prod(self.env.observation_space(agent).shape)), np.float64)
@@ -222,7 +218,7 @@ class runner_QMix:
             new_obses = np.empty((0,len(self.env.agents)*np.prod(self.env.observation_space(agent).shape)), np.float64)
             for t in transitions:
                 obs = np.array([])
-                q_max_online = np.array([])
+                q_action_online = np.array([])
                 q_max_target = np.array([])
                 acts = np.array([])
                 rews = np.array([])
@@ -230,14 +226,14 @@ class runner_QMix:
                 new_obs = np.array([])
                 for agent in self.env.agents:
                     obs = np.concatenate((obs, t[agent][0]))
-                    q_max_online = np.append(q_max_online, self.online_net.get_Q_max(self.online_net.get_Q_values(agent, t[agent][0]))[1].cpu().detach())
+                    q_action_online = np.append(q_action_online, torch.gather(self.online_net.get_Q_values(agent, t[agent][0]).squeeze(0), 0,torch.tensor([t[agent][1]]).to(device))) 
                     q_max_target = np.append(q_max_target, self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4]))[1].cpu().detach())
                     acts = np.append(acts, t[agent][1])
                     rews = np.append(rews, t[agent][2])
                     done = np.append(done, t[agent][3])
                     new_obs = np.concatenate((new_obs, t[agent][4]))
                 obses = np.append(obses, [obs], axis = 0)
-                Q_ins_online = np.append(Q_ins_online, [q_max_online], axis = 0)
+                Q_ins_online = np.append(Q_ins_online, [q_action_online], axis = 0)
                 Q_ins_target = np.append(Q_ins_target, [q_max_target], axis = 0)
                 actions = np.append(actions, [acts], axis = 0)
                 rewards = np.append(rewards, [rews], axis = 0)
@@ -245,7 +241,6 @@ class runner_QMix:
                 new_obses = np.append(new_obses, [new_obs], axis = 0)
             Q_ins_online_t = torch.as_tensor(Q_ins_online, dtype=torch.float32, device=device)
             Q_ins_target_t = torch.as_tensor(Q_ins_target, dtype=torch.float32, device=device)
-
 
             obses_t = torch.as_tensor(obses, dtype=torch.float32, device=device)
             actions_t = torch.as_tensor(actions, dtype=torch.int64, device=device).unsqueeze(-1)
