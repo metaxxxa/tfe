@@ -82,10 +82,13 @@ class QMixer(nn.Module):
             nn.Linear(self.args.mixer_hidden_dim, self.args.mixer_hidden_dim2)
         ).to(device)
         agent_params = list()
-        for agent_net in self.agent_nets.values():
-            agent_params += agent_net.net.parameters()
-        self.net_params = agent_params + list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters())  +list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
-        
+        if self.args.COMMON_AGENTS_NETWORK:
+            self.net_params = list(agents_net.parameters()) + list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters())  +list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
+        else:
+            for agent_net in self.agent_nets.values():
+                agent_params += agent_net.net.parameters()
+            self.net_params = agent_params + list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters())  +list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
+            
     
     def forward(self, obs_tot,Qin_t):
         weightsL1 = torch.abs(self.weightsL1_net(obs_tot)) # abs: monotonicity constraint
@@ -221,54 +224,41 @@ class runner_QMix:
             #gradient stept[agent][1]
 
             transitions = random.sample(self.replay_buffer, args.BATCH_SIZE)
-            obses = np.empty((0,len(self.env.agents)*np.prod(self.env.observation_space(agent).shape)), np.float64)
-            actions = np.empty((0,len(self.env.agents)), np.float64)
-            Q_ins_target = np.empty((0,len(self.env.agents)), np.float64)
-            Q_ins_online = np.empty((0,len(self.env.agents)), np.float64)
-            rewards = np.empty((0,len(self.env.agents)), np.float64)
-            dones = np.empty((0,len(self.env.agents)), np.float64)
-            new_obses = np.empty((0,len(self.env.agents)*np.prod(self.env.observation_space(agent).shape)), np.float64)
+            obses_t = torch.empty((self.args.BATCH_SIZE,self.args.n_agents*self.args.observations_dim)).to(device)
+            actions_t = torch.empty((self.args.BATCH_SIZE,self.args.n_agents)).to(device)
+            Q_ins_target_t = torch.empty((self.args.BATCH_SIZE,self.args.n_agents)).to(device)
+            Q_action_online_t = torch.empty((self.args.BATCH_SIZE,self.args.n_agents)).to(device)
+            rewards_t = torch.empty((self.args.BATCH_SIZE,self.args.n_agents)).to(device)
+            dones_t = torch.empty((self.args.BATCH_SIZE,self.args.n_agents)).to(device)
+            new_obses_t = torch.empty((self.args.BATCH_SIZE,self.args.n_agents*self.args.observations_dim)).to(device)
+            transition_nb = 0
             for t in transitions:
-                obs = np.array([])
-                q_action_online = np.array([])
-                q_max_target = np.array([])
-                acts = np.array([])
-                rews = np.array([])
-                done = np.array([]) 
-                new_obs = np.array([])
+                
+                agent_nb = 0
                 for agent in self.env.agents:
-                    obs = np.concatenate((obs, t[agent][0]))
-                    q_action_online = np.append(q_action_online, torch.gather(self.online_net.get_Q_values(agent, t[agent][0]).squeeze(0), 0,torch.tensor([t[agent][1]]).to(device)).cpu().detach()) 
-                    q_max_target = np.append(q_max_target, self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4]))[1].cpu().detach())
-                    acts = np.append(acts, t[agent][1])
-                    rews = np.append(rews, t[agent][2])
-                    done = np.append(done, t[agent][3])
-                    new_obs = np.concatenate((new_obs, t[agent][4]))
-                obses = np.append(obses, [obs], axis = 0)
-                Q_ins_online = np.append(Q_ins_online, [q_action_online], axis = 0)
-                Q_ins_target = np.append(Q_ins_target, [q_max_target], axis = 0)
-                actions = np.append(actions, [acts], axis = 0)
-                rewards = np.append(rewards, [rews], axis = 0)
-                dones = np.append(dones, [done], axis = 0)
-                new_obses = np.append(new_obses, [new_obs], axis = 0)
-            Q_ins_online_t = torch.as_tensor(Q_ins_online, dtype=torch.float32, device=device)
-            Q_ins_target_t = torch.as_tensor(Q_ins_target, dtype=torch.float32, device=device)
+                    obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][0], dtype=torch.float32, device=device)
+                    actions_t[transition_nb][agent_nb] = t[agent][1]
+                    rewards_t[transition_nb][agent_nb] = t[agent][2]
+                    dones_t[transition_nb][agent_nb] = t[agent][3]
+                    new_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4], dtype=torch.float32, device=device)
 
-            obses_t = torch.as_tensor(obses, dtype=torch.float32, device=device)
-            actions_t = torch.as_tensor(actions, dtype=torch.int64, device=device).unsqueeze(-1)
-            rewards_t = torch.as_tensor(rewards, dtype=torch.float32, device=device).unsqueeze(-1)
-            dones_t = torch.as_tensor(dones, dtype=torch.float32, device=device).unsqueeze(-1)
-            new_obses_t = torch.as_tensor(new_obses, dtype=torch.float32, device=device)
-            
+                    Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0]).squeeze(0), 0,torch.tensor([t[agent][1]]).to(device))
+                    Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4]))[1]
+                     
+                    agent_nb += 1
+
+
+                transition_nb += 1
+
             #compute reward for all agents
             rewards_t = rewards_t.sum(1)
             #if one agent is done all are
             dones_t = dones_t.sum(1)
             dones_t = dones_t > 0
             # targets
-            Qtot_max_target = self.target_net.forward(new_obses_t, Q_ins_target_t) #.max(dim=1, keepdim=True)[0]
-            Qtot_online = self.online_net.forward(obses_t, Q_ins_online_t)
-            y_tot = rewards_t + args.GAMMA*(1 + (-1)*dones_t)*Qtot_max_target
+            Qtot_max_target = self.target_net.forward(new_obses_t, Q_ins_target_t) 
+            Qtot_online = self.online_net.forward(obses_t, Q_action_online_t)
+            y_tot = rewards_t + self.args.GAMMA*(1 + (-1)*dones_t)*Qtot_max_target
 
         ########### busy
             # loss 
