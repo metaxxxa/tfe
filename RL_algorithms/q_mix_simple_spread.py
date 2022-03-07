@@ -1,3 +1,4 @@
+from ast import arg
 from tkinter import N
 from types import AsyncGeneratorType
 import torch
@@ -37,8 +38,9 @@ class Args:
         #agent network parameters
         self.dim_L1_agents_net = 32
         self.dim_L2_agents_net = 32
-        #
-
+        #mixing network parameters
+        self.mixer_hidden_dim = 32
+        self.mixer_hidden_dim2 = 32
         #environment specific parameters calculation
         self.params(env)
 
@@ -57,21 +59,20 @@ class QMixer(nn.Module):
         self.to(device)
         self.agent_nets = dict()
         #params
-
+        self.args = args
         total_state_dim = 0
         for agent in env.agents:
             self.agent_nets[agent] = AgentRNN(args)
             total_state_dim += np.prod(env.observation_space(agent).shape)
-        mixer_hidden_dim = 32
-        mixer_hidden_dim2 = 32
-        self.weightsL1_net = nn.Linear(total_state_dim, mixer_hidden_dim).to(device)
-        self.biasesL1_net = nn.Linear(total_state_dim, mixer_hidden_dim).to(device)
         
-        self.weightsL2_net = nn.Linear(total_state_dim, mixer_hidden_dim2).to(device)
+        self.weightsL1_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim*self.args.n_agents).to(device)
+        self.biasesL1_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim).to(device)
+        
+        self.weightsL2_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim2*self.args.mixer_hidden_dim).to(device)
         self.biasesL2_net = nn.Sequential(
-            nn.Linear(total_state_dim, mixer_hidden_dim),
+            nn.Linear(total_state_dim, self.args.mixer_hidden_dim),
             nn.ReLU(),
-            nn.Linear(mixer_hidden_dim, mixer_hidden_dim2)
+            nn.Linear(self.args.mixer_hidden_dim, self.args.mixer_hidden_dim2)
         ).to(device)
         agent_params = list()
         for agent_net in self.agent_nets.values():
@@ -81,13 +82,15 @@ class QMixer(nn.Module):
     
     def forward(self, obs_tot,Qin_t):
         weightsL1 = torch.abs(self.weightsL1_net(obs_tot)) # abs: monotonicity constraint
+        weightsL1_tensor = weightsL1.unsqueeze(-1).reshape([self.args.BATCH_SIZE, self.args.mixer_hidden_dim, self.args.n_agents])
         biasesL1 = self.biasesL1_net(obs_tot)
         weightsL2 = torch.abs(self.weightsL2_net(obs_tot))
+        weightsL2_tensor = weightsL2.unsqueeze(-1).reshape([self.args.BATCH_SIZE, self.args.mixer_hidden_dim2, self.args.mixer_hidden_dim])
         biasesL2 = self.biasesL2_net(obs_tot)
-        l1 = weightsL1*Qin_t.sum(1)[:,None] + biasesL1
+        l1 = torch.matmul(weightsL1_tensor, Qin_t.unsqueeze(-1)).squeeze(-1) + biasesL1
         l1 = nn.ELU(l1).alpha
-        Qtot = weightsL2*l1.sum(1)[:,None]+ biasesL2
-        Qtot = Qtot.sum(1).unsqueeze(-1) 
+        Qtot = torch.matmul(weightsL2_tensor, l1.unsqueeze(-1)).squeeze(-1) + biasesL2
+        Qtot = Qtot.sum(1)
         
         return Qtot
         
@@ -226,7 +229,7 @@ class runner_QMix:
                 new_obs = np.array([])
                 for agent in self.env.agents:
                     obs = np.concatenate((obs, t[agent][0]))
-                    q_action_online = np.append(q_action_online, torch.gather(self.online_net.get_Q_values(agent, t[agent][0]).squeeze(0), 0,torch.tensor([t[agent][1]]).to(device))) 
+                    q_action_online = np.append(q_action_online, torch.gather(self.online_net.get_Q_values(agent, t[agent][0]).squeeze(0), 0,torch.tensor([t[agent][1]]).to(device)).cpu().detach()) 
                     q_max_target = np.append(q_max_target, self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4]))[1].cpu().detach())
                     acts = np.append(acts, t[agent][1])
                     rews = np.append(rews, t[agent][2])
