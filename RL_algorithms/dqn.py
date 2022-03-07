@@ -84,12 +84,12 @@ class runner_DQN:
         self.target_net.load_state_dict(self.online_net.state_dict())
         self.optimizer = torch.optim.Adam(self.online_net.net.parameters(), lr = self.args.LEARNING_RATE)
 
-    #Init replay buffer
+  
 
     def run(self):
         observation = self.env.reset()
         episode_reward = 0.0
-
+        #Init replay buffer
         for _ in range(self.args.MIN_BUFFER_LENGTH):
             transition = []
             action = self.env.action_space.sample()
