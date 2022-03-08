@@ -25,14 +25,14 @@ class Args:
             
         self.BUFFER_SIZE = 500
         self.REW_BUFFER_SIZE = 100
-        self.LEARNING_RATE = 1e-4
+        self.LEARNING_RATE = 1e-5
         self.MIN_BUFFER_LENGTH = 1000
         self.BATCH_SIZE = 32
         self.GAMMA = 0.9
         self.EPSILON_START = 1
-        self.EPSILON_END = 0.001
+        self.EPSILON_END = 0.01
         self.EPSILON_DECAY = 100000
-        self.SYNC_TARGET_FRAMES = 1000
+        self.SYNC_TARGET_FRAMES = 500
         self.VISUALIZE_WHEN_LEARNED = True
         
         #agent network parameters
@@ -63,15 +63,16 @@ class QMixer(nn.Module):
         self.args = args
         total_state_dim = 0
         if self.args.COMMON_AGENTS_NETWORK:
-            agents_net = AgentRNN(self.args)
+            self.agents_net = AgentRNN(self.args)
             for agent in env.agents:
-                self.agent_nets[agent] = agents_net
-                total_state_dim += np.prod(env.observation_space(agent).shape)
+                #self.agent_nets[agent] = self.agents_net
+                total_state_dim += np.prod(env.observation_space(agent).shape)                
+
         else:
             for agent in env.agents:
                 self.agent_nets[agent] = AgentRNN(args)
                 total_state_dim += np.prod(env.observation_space(agent).shape)
-        
+             
         self.weightsL1_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim*self.args.n_agents).to(device)
         self.biasesL1_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim).to(device)
         
@@ -83,13 +84,19 @@ class QMixer(nn.Module):
         ).to(device)
         agent_params = list()
         if self.args.COMMON_AGENTS_NETWORK:
-            self.net_params = list(agents_net.parameters()) + list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters())  +list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
+            self.net_params = list(self.agents_net.parameters()) + list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters())  +list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
         else:
             for agent_net in self.agent_nets.values():
                 agent_params += agent_net.net.parameters()
             self.net_params = agent_params + list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters())  +list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
-            
-    
+
+    def get_agent_nets(self, agent):
+        if self.args.COMMON_AGENTS_NETWORK:
+            return self.agents_net
+        else:
+            return self.agent_nets[agent]
+     
+        
     def forward(self, obs_tot,Qin_t):
         weightsL1 = torch.abs(self.weightsL1_net(obs_tot)) # abs: monotonicity constraint
         weightsL1_tensor = weightsL1.unsqueeze(-1).reshape([self.args.BATCH_SIZE, self.args.mixer_hidden_dim, self.args.n_agents])
@@ -106,7 +113,7 @@ class QMixer(nn.Module):
         
     def get_Q_values(self, agent, obs):
         obs_t = torch.as_tensor(obs, dtype=torch.float32).to(device)
-        q_values = self.agent_nets[agent].net(obs_t.unsqueeze(0))
+        q_values = self.get_agent_nets(agent).net(obs_t.unsqueeze(0))
         return q_values
 
     def get_Q_max(self, q_values):
@@ -118,7 +125,8 @@ class QMixer(nn.Module):
     def act(self, agent, obs):
         action, _ = self.get_Q_max(self.get_Q_values(agent, obs))
         return action
-    
+        
+        
     
 class AgentRNN(nn.Module):
     def __init__(self,args):
