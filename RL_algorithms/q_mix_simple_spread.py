@@ -23,16 +23,16 @@ writer = SummaryWriter()
 class Args:
     def __init__(self, env):
             
-        self.BUFFER_SIZE = 1000
+        self.BUFFER_SIZE = 500
         self.REW_BUFFER_SIZE = 100
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 1000
-        self.BATCH_SIZE = 200
+        self.BATCH_SIZE = 32
         self.GAMMA = 0.9
         self.EPSILON_START = 1
         self.EPSILON_END = 0.001
         self.EPSILON_DECAY = 100000
-        self.SYNC_TARGET_FRAMES = 100
+        self.SYNC_TARGET_FRAMES = 1000
         self.VISUALIZE_WHEN_LEARNED = True
         
         #agent network parameters
@@ -290,7 +290,7 @@ class runner_QMix:
 
         ###
 if __name__ == "__main__":
-    env = simple_spread_v2.env(N=2, local_ratio=0.5, max_cycles=25, continuous_actions=False)
+    env = simple_spread_v2.env(N=1, local_ratio=0.5, max_cycles=25, continuous_actions=False)
     env.reset()
     args = Args(env)
     runner = runner_QMix(env, args)
