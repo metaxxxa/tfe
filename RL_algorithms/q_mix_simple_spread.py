@@ -1,6 +1,4 @@
-from ast import arg
-from tkinter import N
-from types import AsyncGeneratorType
+from datetime import datetime
 import torch
 import torch.nn as nn
 import numpy as np
@@ -24,7 +22,7 @@ class Args:
     def __init__(self, env):
             
         self.BUFFER_SIZE = 500
-        self.REW_BUFFER_SIZE = 100
+        self.REW_BUFFER_SIZE = 1000
         self.LEARNING_RATE = 1e-5
         self.MIN_BUFFER_LENGTH = 1000
         self.BATCH_SIZE = 32
@@ -43,6 +41,7 @@ class Args:
         self.mixer_hidden_dim = 32
         self.mixer_hidden_dim2 = 32
         #environment specific parameters calculation
+        
         self.params(env)
 
     def params(self, env):  #environment specific parameters calculation
@@ -51,8 +50,10 @@ class Args:
         self.nb_inputs_agent = np.prod(env.observation_space(agent).shape)
         self.observations_dim = env.observation_space(agent).shape[0]
         self.n_actions = env.action_space(agent).n
-
-
+    def log_params(self, writer):
+        hparams = {'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now())), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
+        metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net, 'hparam/mixer hidden dim 1': self.mixer_hidden_dim, 'hparam/mixer hidden dim 2': self.mixer_hidden_dim2, 'envparam/nb_agents': self.n_agents}
+        writer.add_hparams(hparams, metric_dict)
 
 class QMixer(nn.Module):
     def __init__(self, env, args):
@@ -157,7 +158,7 @@ class runner_QMix:
     def run(self):
         
         #Init replay buffer
-
+        
         self.env.reset()
         one_agent_done = 0
 
@@ -298,8 +299,9 @@ class runner_QMix:
 
         ###
 if __name__ == "__main__":
-    env = simple_spread_v2.env(N=1, local_ratio=0.5, max_cycles=25, continuous_actions=False)
+    env = simple_spread_v2.env(N=3, local_ratio=0.18, max_cycles=25, continuous_actions=False)
     env.reset()
     args = Args(env)
+    args.log_params(writer)
     runner = runner_QMix(env, args)
     runner.run()
