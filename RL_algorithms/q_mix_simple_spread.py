@@ -9,6 +9,8 @@ import random
 from torch.utils.tensorboard import SummaryWriter
 import copy
 import os
+import sys
+import time
 if torch.cuda.is_available():  
   dev = "cuda:0" 
 else:  
@@ -23,21 +25,24 @@ class Args:
     def __init__(self, env):
             
         self.BUFFER_SIZE = 200
-        self.REW_BUFFER_SIZE = 1000
+        self.REW_BUFFER_SIZE = 100
         self.LEARNING_RATE = 1e-4
-        self.MIN_BUFFER_LENGTH = 1000
+        self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 32
-        self.GAMMA = 0.9
+        self.GAMMA = 0.95
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 10000
-        self.SYNC_TARGET_FRAMES = 100
+        self.EPSILON_DECAY = 200000
+        self.SYNC_TARGET_FRAMES = 200
+        #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
-        self.VISUALIZE_AFTER = 100000
+        self.VISUALIZE_AFTER = 500000
         self.VISUALIZE = False
+        self.WAIT_BETWEEN_STEPS = 0.1
         self.GREEDY = True
         self.SAVE_CYCLE = 5000
         self.MODEL_DIR = 'simple_spread_QMix'
+        self.RUN_NAME = ''
         #agent network parameters
         self.COMMON_AGENTS_NETWORK = True
         self.dim_L1_agents_net = 32
@@ -168,6 +173,7 @@ class runner_QMix:
 
         self.sync_networks()
         self.optimizer = torch.optim.Adam(self.online_net.net_params, lr = self.args.LEARNING_RATE)
+        #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
     def sync_networks(self):
         self.target_net.load_state_dict(self.online_net.state_dict())
         if self.args.COMMON_AGENTS_NETWORK:
@@ -184,14 +190,30 @@ class runner_QMix:
 
     def save_model(self, train_step):  #taken from https://github.com/koenboeckx/qmix/blob/main/qmix.py to save learnt model
         num = str(train_step // self.args.SAVE_CYCLE)
-        if not os.path.exists(self.args.MODEL_DIR):
-            os.makedirs(self.args.MODEL_DIR)
-        torch.save(self.online_net.state_dict(), self.args.MODEL_DIR + '/' + num + '_qmix_net_params.pkl')
+        if self.args.RUN_NAME != '':
+            dirname = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y")
+        else:
+            dirname = self.args.MODEL_DIR + '/' +datetime.now().strftime("%d%H%M%b%Y")
+
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        torch.save(self.online_net.state_dict(), dirname + '/' + '/qmix_net_params.pt')
         if self.args.COMMON_AGENTS_NETWORK:
-            torch.save(self.online_net.agents_net.state_dict(),  self.args.MODEL_DIR + '/'  + num + '_agent_net_params.pkl')
+            torch.save(self.online_net.agents_net.state_dict(),  dirname + '/agents_net_params.pt')
         else:
             for agent in self.env.agents:
-                torch.save(self.online_net.agents_nets.state_dict(),  self.args.MODEL_DIR + '/agents_nets_params/'  + agent + '/'+ num + '_agent_net_params.pkl')
+                torch.save(self.online_net.agents_nets.state_dict(),  dirname + '/agent_nets_params/'  + agent + '.pt')
+
+    def load_model(self, dir):
+        mixer_model = dir + '/qmix_net_params.pt'
+        self.online_net.load_state_dict(torch.load(mixer_model))
+        if self.args.COMMON_AGENTS_NETWORK:
+            agent_model = dir + '/agents_net_params.pt'
+            self.online_net.agents_net.load_state_dict(torch.load(agent_model))
+        else:
+            for agent in self.env.agents:
+                agent_model = dir + '/agent_nets_params/' + agent +'.pt'
+                self.online_net.agents_nets[agent].load_state_dict(torch.load(agent_model))
 
     def run(self):
         
@@ -205,6 +227,7 @@ class runner_QMix:
         hidden_state_prev = dict()
         hidden_state = dict()
         episode_reward = 0.0
+        nb_transitions = 0
         for agent in self.env.agents:
             observation_prev[agent], _, _, _ = self.env.last()
             hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
@@ -222,16 +245,18 @@ class runner_QMix:
                     self.visualize()
                 observation[agent], reward, done, info = self.env.last()
                 episode_reward += reward
+                nb_transitions += 1
                 transition[agent] = (observation_prev[agent], action,reward,done,observation[agent],hidden_state_prev[agent], hidden_state[agent])
                 observation_prev[agent] = observation[agent]
                 hidden_state_prev[agent] = hidden_state[agent]
                 if done:
                     one_agent_done = 1 #if one agent is done, all have to stop
             if one_agent_done:
-                episode_reward = episode_reward/self.args.n_agents
+                episode_reward = episode_reward/(self.args.n_agents*nb_transitions)
                 self.rew_buffer.append(episode_reward)
                 self.env.reset()
                 episode_reward = 0.0
+                nb_transitions = 0
                 one_agent_done = 0
                 for agent in self.env.agents:
                     observation_prev[agent], _, _, _ = self.env.last()
@@ -330,10 +355,10 @@ class runner_QMix:
             error = y_tot + (-1)*Qtot_online
             
             loss = error**2
-            writer.add_scalar("Loss", torch.mean(loss).item(), step)
+            mean_loss = torch.mean(loss)
             loss = loss.sum()
-            self.loss_buffer.append(loss.item())  # detach ?????????????????
-            
+            self.loss_buffer.append(mean_loss.item())  # detach ?????????????????
+            writer.add_scalar("Loss", mean_loss.item(), step)
             
 
 
@@ -341,7 +366,7 @@ class runner_QMix:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-
+            #self.scheduler.step(np.mean(self.loss_buffer))
             #update target network
 
             if step % args.SYNC_TARGET_FRAMES == 0:
@@ -353,17 +378,66 @@ class runner_QMix:
                 self.save_model(step)
 
             #logging
-            if step % 1000 == 0:
+            if step % self.args.REW_BUFFER_SIZE == 0:
                 print('\n Step', step )
-                print('Avg Reward', np.mean(self.rew_buffer))
-                print('Avg Loss', np.mean(self.loss_buffer))
+                print('Avg Reward /agent /transition', np.mean(self.rew_buffer))
+                print('Avg Loss over a batch', np.mean(self.loss_buffer))
         writer.close() 
+
+    def eval(self, params_directory):
+
+        self.load_model(params_directory)
+        observation_prev = dict()
+        observation = dict()
+        hidden_state_prev = dict()
+        hidden_state = dict()
+        self.env.reset()
+        episode_reward = 0.0
+        nb_transitions = 0
+        one_agent_done = 0
+        for agent in self.env.agents:
+            observation_prev[agent], _, _, _ = self.env.last()
+            hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
+        for step in itertools.count():
+            for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
+
+                action, hidden_state[agent] = self.online_net.act(agent, observation_prev[agent], hidden_state_prev[agent])
+                if one_agent_done:
+                    self.env.step(None)
+                    self.env.render()
+                    time.sleep(self.args.WAIT_BETWEEN_STEPS)
+                else:
+                    self.env.step(action)
+                    self.env.render()
+                    time.sleep(self.args.WAIT_BETWEEN_STEPS)
+                observation[agent], reward, done, info = self.env.last()
+                nb_transitions += 1
+                episode_reward += reward
+                observation_prev[agent] = observation[agent]
+                hidden_state_prev[agent] = hidden_state[agent]
+                if done:
+                    one_agent_done = 1 #if one agent is done, all have to stop
+            if one_agent_done:
+                episode_reward = episode_reward/(self.args.n_agents*nb_transitions)
+                print('Mean episode reward /agent /transition : {episode_reward}')
+                self.env.reset()
+                episode_reward = 0.0
+                nb_transitions = 0
+                one_agent_done = 0
+                for agent in self.env.agents:
+                    observation_prev[agent], _, _, _ = self.env.last()
+                    hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
+            
 
         ###
 if __name__ == "__main__":
-    env = simple_spread_v2.env(N=1, local_ratio=0.5, max_cycles=12, continuous_actions=False)
+    env = simple_spread_v2.env(N=1, local_ratio=0.5, max_cycles=25, continuous_actions=False)
     env.reset()
     args = Args(env)
     args.log_params(writer)
     runner = runner_QMix(env, args)
-    runner.run()
+    if len(sys.argv) == 1:
+        runner.run()
+    else:
+        runner.eval(sys.argv[1])
+
