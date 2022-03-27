@@ -21,6 +21,7 @@ if torch.cuda.is_available():
   dev = "cuda:0" 
 else:  
   dev = "cpu"  
+  
 device = torch.device(dev) 
 
 #setting up TensorBoard
@@ -69,6 +70,7 @@ class Args:
     def params(self, env):  #environment specific parameters calculation
         
         self.agents = [key for key in env.agents if re.match(rf'^{self.TEAM_TO_TRAIN}',key)]
+        self.all_agents = env.agents
         self.opposing_agents = [key for key in env.agents if re.match(rf'^{self.OPPOSING_TEAM}',key)]
         self.n_agents = len(self.agents)
         agent = self.agents[0]
@@ -308,16 +310,16 @@ class runner_QMix:
         for _ in range(self.args.MIN_BUFFER_LENGTH):
             
             self.transition = dict()
-            for agent in self.env.agent_iter(max_iter=len(self.args.agents)):
+            for agent in self.env.agent_iter(max_iter=len(self.args.all_agents)):
                 if self.is_opposing_team(agent):
-                    self.opposing_team_buffers.observation[agent], _, _, _ = self.env.last()
+                    self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
                     
                 else:
-                    self.blue_team_buffers.observation[agent], _, _, _ = self.env.last()
+                    self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.random_action(agent, self.blue_team_buffers.observation[agent])
                     _, self.blue_team_buffers.hidden_state[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state_prev[agent])
-                if one_agent_done:
+                if done:
                     self.env.step(None)
                     self.visualize()
                 else:
@@ -327,7 +329,8 @@ class runner_QMix:
                 if done:
                     one_agent_done = 1 #if one agent is done, all have to stop
                     
-            self.blue_team_buffers.replay_buffer.append(self.transition)
+            if one_agent_done == 0:
+                self.blue_team_buffers.replay_buffer.append(self.transition)
             if one_agent_done:
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_agents*self.blue_team_buffers.nb_transitions)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
@@ -337,8 +340,6 @@ class runner_QMix:
                 one_agent_done = 0
                 for agent in self.args.agents:
                     self.reset_buffer(agent)
-            if action == None:
-                return done
         # trainingoptim
 
         self.env.reset()
@@ -353,17 +354,17 @@ class runner_QMix:
             epsilon = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.EPSILON_START, self.args.EPSILON_END])
             rnd_sample = random.random()
             self.transition = dict()
-            for agent in self.env.agent_iter(max_iter=len(self.args.agents)):
+            for agent in self.env.agent_iter(max_iter=len(self.args.all_agents)):
                 if self.is_opposing_team(agent):
-                    self.opposing_team_buffers.observation[agent], _, _, _ = self.env.last()
+                    self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
                     
                 else:
-                    self.blue_team_buffers.observation[agent], _, _, _ = self.env.last()
+                    self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action, self.blue_team_buffers.hidden_state[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state_prev[agent])
                     if rnd_sample <= epsilon and self.args.GREEDY:
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
-                if one_agent_done:
+                if done:
                     self.env.step(None)
                     self.visualize()
                 else:
@@ -372,8 +373,8 @@ class runner_QMix:
                 done = self.update_buffer(agent, action)
                 if done:
                         one_agent_done = 1 #if one agent is done, all have to stop
-            
-            self.blue_team_buffers.replay_buffer.append(self.transition)
+            if one_agent_done == 0:
+                self.blue_team_buffers.replay_buffer.append(self.transition)
             if one_agent_done:
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_agents*self.blue_team_buffers.nb_transitions)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
@@ -474,10 +475,10 @@ class runner_QMix:
             observation_prev[agent], _, _, _ = self.env.last()
             hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
         for step in itertools.count():
-            for agent in self.env.agent_iter(max_iter=len(self.args.agents)):
-
+            for agent in self.env.agent_iter(max_iter=len(self.args.all_agents)):
+                observation[agent], _, done, _ = self.env.last()
                 action, hidden_state[agent] = self.online_net.act(agent, observation_prev[agent], hidden_state_prev[agent])
-                if one_agent_done:
+                if done:
                     self.env.step(None)
                     self.env.render()
                     time.sleep(self.args.WAIT_BETWEEN_STEPS)
