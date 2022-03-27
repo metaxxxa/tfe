@@ -29,7 +29,7 @@ writer = SummaryWriter()
 #environment constants
 EPISODE_MAX_LENGTH = 200
 MAX_DISTANCE = 5
-
+TERRAIN = 'central_7x7_2v2'
 #parameters
 class Args:
     def __init__(self, env):
@@ -46,7 +46,7 @@ class Args:
         self.SYNC_TARGET_FRAMES = 200
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
-        self.VISUALIZE_AFTER = 50000000
+        self.VISUALIZE_AFTER = 5000000
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.1
         self.GREEDY = True
@@ -76,8 +76,8 @@ class Args:
         self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.n_actions = env.action_space(agent).n
     def log_params(self, writer):
-        hparams = {'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now())), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
-        metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net, 'hparam/mixer hidden dim 1': self.mixer_hidden_dim, 'hparam/mixer hidden dim 2': self.mixer_hidden_dim2, 'envparam/nb_agents': self.n_agents}
+        hparams = {'envparam/terrrain': TERRAIN,'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now())), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
+        metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net, 'hparam/mixer hidden dim 1': self.mixer_hidden_dim, 'hparam/mixer hidden dim 2': self.mixer_hidden_dim2}
         writer.add_hparams(hparams, metric_dict)
 
 def mask_array(array, mask):
@@ -158,7 +158,10 @@ class QMixer(nn.Module):
         with torch.no_grad():
             q_values, hidden_state = self.get_Q_values(agent, obs, hidden_state)
             #taking only masked q values to choose action to take
-            action, _ = self.get_Q_max(torch.masked_select(q_values, torch.as_tensor(obs['action_mask'], dtype=torch.bool,device=device)).unsqueeze(0), q_values)
+            masked_q_val = torch.masked_select(q_values, torch.as_tensor(obs['action_mask'], dtype=torch.bool,device=device)).unsqueeze(0)
+            if masked_q_val.numel() == 0:
+                return None, hidden_state
+            action, _ = self.get_Q_max(masked_q_val, q_values)
             return action, hidden_state
     
         
@@ -202,14 +205,20 @@ class runner_QMix:
         self.opposing_team_buffers = buffers(self.env, self.args, self.args.opposing_agents)
         self.online_net = QMixer(self.env, self.args)
         self.target_net = copy.deepcopy(self.online_net) #QMixer(self.env, self.args)
-
+        #display model graphs in tensorboard
+        writer.add_graph(self.online_net.get_agent_nets(self.args.agents[0]),(torch.empty((self.args.observations_dim),device=device), torch.empty((1, self.args.dim_L2_agents_net),device=device)) )
+        writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_agents*self.args.observations_dim), device=device)
+, torch.empty((self.args.BATCH_SIZE,self.args.n_agents), device=device)))
         self.sync_networks()
         self.optimizer = torch.optim.Adam(self.online_net.net_params, lr = self.args.LEARNING_RATE)
         #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
     def random_action(self, agent, obs):
-        int = mask_array(range(self.env.action_space(agent).n), obs['action_mask'])
+        if all(element == 0 for element in obs['action_mask']):
+            return None
         return random.choice(mask_array(range(self.env.action_space(agent).n), obs['action_mask']))
     def update_buffer(self, agent, action):
+        if action == None:
+            action = -1
         if self.is_opposing_team(agent):
             self.opposing_team_buffers.observation[agent], reward, done, _ = self.env.last()
             self.opposing_team_buffers.episode_reward += reward
@@ -224,7 +233,7 @@ class runner_QMix:
             self.transition[agent] = (self.blue_team_buffers.observation_prev[agent], action,reward,done,self.blue_team_buffers.observation[agent],self.blue_team_buffers.hidden_state_prev[agent], self.blue_team_buffers.hidden_state[agent])
             self.blue_team_buffers.observation_prev[agent] = self.blue_team_buffers.observation[agent]
             self.blue_team_buffers.hidden_state_prev[agent] = self.blue_team_buffers.hidden_state[agent]
-            self.blue_team_buffers.replay_buffer.append(self.transition)
+            
         return done
 
     def reset_buffer(self,agent):
@@ -296,7 +305,7 @@ class runner_QMix:
         self.opposing_team_buffers = buffers(self.env, self.args, self.args.opposing_agents)
 
         one_agent_done = 0
-        for _ in range(args.MIN_BUFFER_LENGTH):
+        for _ in range(self.args.MIN_BUFFER_LENGTH):
             
             self.transition = dict()
             for agent in self.env.agent_iter(max_iter=len(self.args.agents)):
@@ -317,6 +326,8 @@ class runner_QMix:
                 done = self.update_buffer(agent, action)
                 if done:
                     one_agent_done = 1 #if one agent is done, all have to stop
+                    
+            self.blue_team_buffers.replay_buffer.append(self.transition)
             if one_agent_done:
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_agents*self.blue_team_buffers.nb_transitions)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
@@ -326,8 +337,8 @@ class runner_QMix:
                 one_agent_done = 0
                 for agent in self.args.agents:
                     self.reset_buffer(agent)
-            
-
+            if action == None:
+                return done
         # trainingoptim
 
         self.env.reset()
@@ -339,7 +350,7 @@ class runner_QMix:
 
             if step > self.args.VISUALIZE_AFTER:
                 self.args.VISUALIZE = True
-            epsilon = np.interp(step, [0, args.EPSILON_DECAY], [args.EPSILON_START, args.EPSILON_END])
+            epsilon = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.EPSILON_START, self.args.EPSILON_END])
             rnd_sample = random.random()
             self.transition = dict()
             for agent in self.env.agent_iter(max_iter=len(self.args.agents)):
@@ -359,8 +370,10 @@ class runner_QMix:
                     self.env.step(action)
                     self.visualize()
                 done = self.update_buffer(agent, action)
-            if done:
-                    one_agent_done = 1 #if one agent is done, all have to stop
+                if done:
+                        one_agent_done = 1 #if one agent is done, all have to stop
+            
+            self.blue_team_buffers.replay_buffer.append(self.transition)
             if one_agent_done:
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_agents*self.blue_team_buffers.nb_transitions)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
@@ -493,7 +506,7 @@ class runner_QMix:
 
         ###
 if __name__ == "__main__":
-    env = defense_v0.env(terrain='flat_5x5', max_cycles=EPISODE_MAX_LENGTH, max_distance=MAX_DISTANCE )
+    env = defense_v0.env(terrain=TERRAIN, max_cycles=EPISODE_MAX_LENGTH, max_distance=MAX_DISTANCE )
     env.reset()
     args = Args(env)
     args.log_params(writer)
