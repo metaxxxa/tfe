@@ -222,6 +222,7 @@ class runner_QMix:
         if action == None:
             action = -1
         if self.is_opposing_team(agent):
+            a,b,c,d = self.env.last()
             self.opposing_team_buffers.observation[agent], reward, done, _ = self.env.last()
             self.opposing_team_buffers.episode_reward += reward
             
@@ -255,7 +256,7 @@ class runner_QMix:
             
             self.blue_team_buffers.episode_reward = 0
             self.blue_team_buffers.nb_transitions = 0
-            for agents in self.args.agents:
+            for agent in self.args.agents:
                 self.reset_buffer(agent)
     def is_opposing_team(self, agent):
         if re.match(rf'^{self.args.OPPOSING_TEAM}',agent):
