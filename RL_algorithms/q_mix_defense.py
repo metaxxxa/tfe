@@ -230,6 +230,7 @@ class runner_QMix:
             self.opposing_team_buffers.observation_prev[agent] = self.opposing_team_buffers.observation[agent]
             #self.opposing_team_buffers.hidden_state_prev[agent] = self.opposing_team_buffers.hidden_state[agent]
         else:
+            a,b,c,d = self.env.last()
             self.blue_team_buffers.observation[agent], reward, done, _ = self.env.last()
             self.blue_team_buffers.episode_reward += reward
             
