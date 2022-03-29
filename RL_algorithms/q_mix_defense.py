@@ -43,11 +43,11 @@ class Args:
         self.GAMMA = 0.95
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 200000
+        self.EPSILON_DECAY = 2000000
         self.SYNC_TARGET_FRAMES = 200
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
-        self.VISUALIZE_AFTER = 5000000
+        self.VISUALIZE_AFTER = 500000
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.1
         self.GREEDY = True
@@ -224,21 +224,23 @@ class runner_QMix:
         if self.is_opposing_team(agent):
             self.opposing_team_buffers.observation[agent], reward, done, _ = self.env.last()
             self.opposing_team_buffers.episode_reward += reward
-            self.opposing_team_buffers.nb_transitions += 1
+            
             #self.transition[agent] = (self.opposing_team_buffers.observation_prev[agent], action,reward,done,self.opposing_team_buffers.observation[agent],self.opposing_team_buffers.hidden_state_prev[agent], self.opposing_team_buffers.hidden_state[agent])
             self.opposing_team_buffers.observation_prev[agent] = self.opposing_team_buffers.observation[agent]
             #self.opposing_team_buffers.hidden_state_prev[agent] = self.opposing_team_buffers.hidden_state[agent]
         else:
             self.blue_team_buffers.observation[agent], reward, done, _ = self.env.last()
             self.blue_team_buffers.episode_reward += reward
-            self.blue_team_buffers.nb_transitions += 1
+            
             self.transition[agent] = (self.blue_team_buffers.observation_prev[agent], action,reward,done,self.blue_team_buffers.observation[agent],self.blue_team_buffers.hidden_state_prev[agent], self.blue_team_buffers.hidden_state[agent])
             self.blue_team_buffers.observation_prev[agent] = self.blue_team_buffers.observation[agent]
             self.blue_team_buffers.hidden_state_prev[agent] = self.blue_team_buffers.hidden_state[agent]
             
         return done
-
-    def reset_buffer(self,agent):
+    def step_buffer(self):
+        self.blue_team_buffers.nb_transitions += 1
+        self.opposing_team_buffers.nb_transitions +=1
+    def reset_buffer(self, agent):
         if self.is_opposing_team(agent):
             self.opposing_team_buffers.observation_prev[agent], _, _, _ = self.env.last()
             #self.opposing_team_buffers.hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
@@ -247,6 +249,14 @@ class runner_QMix:
             self.blue_team_buffers.observation_prev[agent], _, _, _ = self.env.last()
             self.blue_team_buffers.hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
 
+    def reset_buffers(self):
+            self.opposing_team_buffers.episode_reward = 0
+            self.opposing_team_buffers.nb_transitions = 0
+            
+            self.blue_team_buffers.episode_reward = 0
+            self.blue_team_buffers.nb_transitions = 0
+            for agents in self.args.agents:
+                self.reset_buffer(agent)
     def is_opposing_team(self, agent):
         if re.match(rf'^{self.args.OPPOSING_TEAM}',agent):
             return True
@@ -310,7 +320,9 @@ class runner_QMix:
         for _ in range(self.args.MIN_BUFFER_LENGTH):
             
             self.transition = dict()
+            self.step_buffer()
             for agent in self.env.agent_iter(max_iter=len(self.args.all_agents)):
+                
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
@@ -327,19 +339,20 @@ class runner_QMix:
                     self.visualize()
                 done = self.update_buffer(agent, action)
                 if done:
-                    one_agent_done = 1 #if one agent is done, all have to stop
-                    
-            if one_agent_done == 0:
+                    one_agent_done = 1
+                 #if one agent is done, all have to stop = not true in this environment ?
+            if one_agent_done ==0 :
                 self.blue_team_buffers.replay_buffer.append(self.transition)
-            if one_agent_done:
+            else:
+                one_agent_done = 0
+            
+            if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
+
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_agents*self.blue_team_buffers.nb_transitions)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.env.reset()
-                self.blue_team_buffers.episode_reward = 0.0
-                self.blue_team_buffers.nb_transitions = 0
-                one_agent_done = 0
-                for agent in self.args.agents:
-                    self.reset_buffer(agent)
+                
+                self.reset_buffers()
         # trainingoptim
 
         self.env.reset()
@@ -353,8 +366,11 @@ class runner_QMix:
                 self.args.VISUALIZE = True
             epsilon = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.EPSILON_START, self.args.EPSILON_END])
             rnd_sample = random.random()
+
             self.transition = dict()
+            self.step_buffer()
             for agent in self.env.agent_iter(max_iter=len(self.args.all_agents)):
+                
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
@@ -371,20 +387,18 @@ class runner_QMix:
                     self.env.step(action)
                     self.visualize()
                 done = self.update_buffer(agent, action)
-                if done:
-                        one_agent_done = 1 #if one agent is done, all have to stop
             if one_agent_done == 0:
                 self.blue_team_buffers.replay_buffer.append(self.transition)
-            if one_agent_done:
+            else:
+                one_agent_done = 0
+            if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
+        
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_agents*self.blue_team_buffers.nb_transitions)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.env.reset()
                 writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
-                self.blue_team_buffers.episode_reward = 0.0
-                self.blue_team_buffers.nb_transitions = 0
                 one_agent_done = 0
-                for agent in self.args.agents:
-                    self.reset_buffer(agent)
+                self.reset_buffers()
 
 
             
