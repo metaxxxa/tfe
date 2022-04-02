@@ -24,13 +24,11 @@ else:
   
 device = torch.device(dev) 
 
-#setting up TensorBoard
-writer = SummaryWriter()
 
 #environment constants
 EPISODE_MAX_LENGTH = 200
 MAX_DISTANCE = 5
-TERRAIN = 'central_7x7_2v2'
+TERRAIN = 'central_5x5'
 #parameters
 class Args:
     def __init__(self, env):
@@ -40,9 +38,9 @@ class Args:
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 32
-        self.GAMMA = 0.95
+        self.GAMMA = 0.99
         self.EPSILON_START = 1
-        self.EPSILON_END = 0.01
+        self.EPSILON_END = 0.02
         self.EPSILON_DECAY = 2000000
         self.SYNC_TARGET_FRAMES = 200
         #visualization parameters
@@ -78,7 +76,7 @@ class Args:
         self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.n_actions = env.action_space(agent).n
     def log_params(self, writer):
-        hparams = {'envparam/terrrain': TERRAIN,'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now())), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
+        hparams = {'envparam/terrrain': TERRAIN,'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0))), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
         metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net, 'hparam/mixer hidden dim 1': self.mixer_hidden_dim, 'hparam/mixer hidden dim 2': self.mixer_hidden_dim2}
         writer.add_hparams(hparams, metric_dict)
 
@@ -222,7 +220,7 @@ class runner_QMix:
         return random.choice(mask_array(range(self.env.action_space(agent).n), obs['action_mask']))
     def update_buffer(self, agent, action):
         if self.is_opposing_team(agent):
-            a,b,c,d = self.env.last()
+            
             self.opposing_team_buffers.observation[agent], reward, done, _ = self.env.last()
             self.opposing_team_buffers.episode_reward += reward
             
@@ -230,7 +228,7 @@ class runner_QMix:
             self.opposing_team_buffers.observation_prev[agent] = self.opposing_team_buffers.observation[agent]
             #self.opposing_team_buffers.hidden_state_prev[agent] = self.opposing_team_buffers.hidden_state[agent]
         else:
-            a,b,c,d = self.env.last()
+            
             self.blue_team_buffers.observation[agent], reward, done, _ = self.env.last()
             self.blue_team_buffers.episode_reward += reward
             
@@ -545,9 +543,11 @@ if __name__ == "__main__":
     env = defense_v0.env(terrain=TERRAIN, max_cycles=EPISODE_MAX_LENGTH, max_distance=MAX_DISTANCE )
     env.reset()
     args = Args(env)
-    args.log_params(writer)
     runner = runner_QMix(env, args)
     if len(sys.argv) == 1:
+        #       setting up TensorBoard
+        writer = SummaryWriter()
+        args.log_params(writer)
         runner.run()
     else:
         runner.eval(sys.argv[1])
