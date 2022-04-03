@@ -1,4 +1,5 @@
 
+from ast import Param
 from datetime import datetime
 import torch
 import torch.nn as nn
@@ -9,9 +10,10 @@ import random
 from torch.utils.tensorboard import SummaryWriter
 import copy
 import os
-import sys
+import sys, getopt
 import time
 import re
+import pickle
 #importing the defense environment
 os.chdir('/home/jack/Documents/ERM/Master thesis/tfe')
 sys.path.insert(0, '/home/jack/Documents/ERM/Master thesis/tfe')
@@ -49,6 +51,9 @@ class Args:
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.1
         self.GREEDY = True
+        #saving models
+        self.ITER_START_STEP = 0 #when starting training with an already trained model, 0 by default without model to load
+        self.MODEL_TO_LOAD = ''
         self.SAVE_CYCLE = 10000
         self.MODEL_DIR = 'defense_params'
         self.RUN_NAME = ''
@@ -79,6 +84,10 @@ class Args:
         hparams = {'envparam/terrrain': TERRAIN, 'Adversary tactic' : self.ADVERSARY_TACTIC, 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0))), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
         metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net, 'hparam/mixer hidden dim 1': self.mixer_hidden_dim, 'hparam/mixer hidden dim 2': self.mixer_hidden_dim2}
         writer.add_hparams(hparams, metric_dict)
+
+class Params:
+    def __init__(self, step):
+        self.step = step
 
 def mask_array(array, mask):
     int = np.ma.compressed(np.ma.masked_where(mask==0, array) )
@@ -301,6 +310,8 @@ class runner_QMix:
 
     def save_model(self, train_step):  #taken from https://github.com/koenboeckx/qmix/blob/main/qmix.py to save learnt model
         num = str(train_step // self.args.SAVE_CYCLE)
+        params = Params(train_step)
+        params.blue_team_replay_buffer = self.blue_team_buffers.replay_buffer
         if self.args.RUN_NAME != '':
             dirname = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") + f'step_{train_step}'
         else:
@@ -314,6 +325,8 @@ class runner_QMix:
         else:
             for agent in self.args.blue_agents:
                 torch.save(self.online_net.agents_nets.state_dict(),  dirname + '/agent_nets_params/'  + agent + '.pt')
+        with open(f'{dirname}/loading_parameters.bin',"wb") as f:
+            pickle.dump(params, f)
 
     def load_model(self, dir):
         mixer_model = dir + '/qmix_net_params.pt'
@@ -325,53 +338,59 @@ class runner_QMix:
             for agent in self.args.blue_agents:
                 agent_model = dir + '/agent_nets_params/' + agent +'.pt'
                 self.online_net.agents_nets[agent].load_state_dict(torch.load(agent_model))
+        with open(f'{dir}/loading_parameters.bin',"rb") as f:
+            self.loading_parameters = pickle.load(f)
+        self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
 
     def run(self):
         
         #Init replay buffer
-        
+        if self.args.MODEL_TO_LOAD != '':
+            self.load_model(self.args.MODEL_TO_LOAD)
+            self.args.ITER_START_STEP = self.loading_parameters.step
         self.env.reset()
-        for _ in range(self.args.MIN_BUFFER_LENGTH):
-            
-            self.transition = dict() #to store the transition 
-            self.step_buffer() #count the number of transitions per episode
-            for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
+        if len(self.blue_team_buffers.replay_buffer) == 0: #initializing replay buffer
+            for _ in range(self.args.MIN_BUFFER_LENGTH):
+                
+                self.transition = dict() #to store the transition 
+                self.step_buffer() #count the number of transitions per episode
+                for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
 
-                if self.is_opposing_team(agent):                   
-                    self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
-                    action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
-                    if done:
-                        action = None
+                    if self.is_opposing_team(agent):                   
+                        self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
+                        action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
+                        if done:
+                            action = None
+                        
+                    else:
+                        self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
+                        action = self.random_action(agent, self.blue_team_buffers.observation[agent])
+                        if done:
+                            action = None
+                        _, self.blue_team_buffers.hidden_state[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state_prev[agent])
                     
-                else:
-                    self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
-                    action = self.random_action(agent, self.blue_team_buffers.observation[agent])
-                    if done:
-                        action = None
-                    _, self.blue_team_buffers.hidden_state[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state_prev[agent])
-                
-                self.env.step(action)
-                self.update_buffer(agent, action)
-                self.visualize()
+                    self.env.step(action)
+                    self.update_buffer(agent, action)
+                    self.visualize()
 
-                #update buffer here
+                    #update buffer here
+                    
+                self.blue_team_buffers.replay_buffer.append(self.transition)
                 
-            self.blue_team_buffers.replay_buffer.append(self.transition)
-            
-            
-            if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
+                
+                if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
 
-                self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents) #
-                self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
-                self.env.reset()
-                
-                self.reset_buffers()
+                    self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents) #
+                    self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
+                    self.env.reset()
+                    
+                    self.reset_buffers()
         # trainingoptim
 
         self.env.reset()
         self.reset_buffers()
 
-        for step in itertools.count():
+        for step in itertools.count(start=self.args.ITER_START_STEP):
 
             if step > self.args.VISUALIZE_AFTER:
                 self.args.VISUALIZE = True
@@ -486,7 +505,7 @@ class runner_QMix:
             #self.scheduler.step(np.mean(self.loss_buffer))
             #update target network
 
-            if step % args.SYNC_TARGET_FRAMES == 0:
+            if step % self.args.SYNC_TARGET_FRAMES == 0:
                 self.sync_networks()
 
             #save model
@@ -543,15 +562,31 @@ class runner_QMix:
 
 
 
-
-if __name__ == "__main__":
+def main(argv):
     env = defense_v0.env(terrain=TERRAIN, max_cycles=EPISODE_MAX_LENGTH, max_distance=MAX_DISTANCE )
     env.reset()
     args = Args(env)
     runner = runner_QMix(env, args)
-    if len(sys.argv) == 1:
-        #       setting up TensorBoard
+    try:
+        opts, args = getopt.getopt(argv,"hl:e:",["load_model=","eval_model="])
+    except getopt.GetoptError:
+        print('error')
+    if len(argv) == 0:
         runner.run()
-    else:
-        runner.eval(sys.argv[1])
+    for opt, arg in opts:
+        if opt == '-h':
+            print('q_mix.py')
+            print ('q_mix.py -l <model_folder_to_load>')
+            print('OR')
+            print('q_mix.py  -e <model_folder_to_eval>')
+            sys.exit()
+        elif opt in ("-l", "--load_model"):
+            runner.args.MODEL_TO_LOAD = arg
+            runner.run()
+        elif opt in ("-e", "--eval_model"):
+            runner.eval(arg)
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
+        
 
