@@ -39,18 +39,18 @@ class Args:
         self.REW_BUFFER_SIZE = 100
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
-        self.BATCH_SIZE = 64
+        self.BATCH_SIZE = 32
         self.GAMMA = 0.95
         self.EPSILON_START = 1
         self.EPSILON_END = 0.02
-        self.EPSILON_DECAY = 100000
+        self.EPSILON_DECAY = 500000
         self.SYNC_TARGET_FRAMES = 200
         #visualization parameters
         self.PRINT_LOGS = False
         self.VISUALIZE_WHEN_LEARNED = True
-        self.VISUALIZE_AFTER = 500000
+        self.VISUALIZE_AFTER = 5000000
         self.VISUALIZE = False
-        self.WAIT_BETWEEN_STEPS = 0
+        self.WAIT_BETWEEN_STEPS = 0.01
         self.GREEDY = True
         self.SAVE_CYCLE = 50000
         self.MODEL_DIR = 'defense_params_dqn'
@@ -62,7 +62,7 @@ class Args:
         #environment specific parameters calculation
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
-        self.ADVERSARY_TACTIC = 'random'
+        self.ADVERSARY_TACTIC = 'passive'
         self.params(env)
 
     def params(self, env):  #environment specific parameters calculation
@@ -168,13 +168,21 @@ class runner:
             return None
         return random.choice(mask_array(range(self.env.action_space(agent).n), obs['action_mask']))
     def update_buffer(self, agent, action):
+        if action == None:
+            action = -1
+            reward = 0
+            done = True
+        else:
+            reward = self.env._cumulative_rewards[agent]
+            done = self.env.dones[agent]
+            
         if self.is_opposing_team(agent):
-            self.opposing_team_buffers.observation[agent], reward, done, _ = self.env.last()
+            self.opposing_team_buffers.observation[agent] = self.env.observe(agent)
             self.opposing_team_buffers.episode_reward += reward
             
             self.opposing_team_buffers.observation_prev[agent] = self.opposing_team_buffers.observation[agent]
         else:
-            self.blue_team_buffers.observation[agent], reward, done, _ = self.env.last()
+            self.blue_team_buffers.observation[agent] = self.env.observe(agent)
             self.blue_team_buffers.episode_reward += reward
             
             self.transition[agent] = (self.blue_team_buffers.observation_prev[agent], action,reward,done,self.blue_team_buffers.observation[agent])
@@ -209,7 +217,7 @@ class runner:
         if self.args.ADVERSARY_TACTIC == 'random':
             return self.random_action(agent, obs)
         if self.args.ADVERSARY_TACTIC == 'passive':
-            return self.env.action_space(agent)[0]
+            return 0 #return first available action : do nothijng
 
     def sync_networks(self):
         for agent in self.args.blue_agents:
@@ -244,7 +252,6 @@ class runner:
         
         self.env.reset()
 
-        one_agent_done = 0
         for _ in range(self.args.MIN_BUFFER_LENGTH):
             
             self.transition = dict() #to store the transition 
@@ -254,26 +261,21 @@ class runner:
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
+                    if done:
+                        action = None
                     
                 else:
                     self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.random_action(agent, self.blue_team_buffers.observation[agent])
-                if done:
-                    self.env.step(None)
-                    self.visualize()
-                else:
-                    self.env.step(action)
-                    self.visualize()
-                if action == None:
-                    action = -1
-                done = self.update_buffer(agent, action)
-                if done or (action == -1 and self.is_opposing_team(agent) == False): #not taking into account transitions where an agent is done or where a blue agent took the None action, which is otherwise not available
-                    one_agent_done = 1
-                 #if one agent is done, all have to stop = not true in this environment ?
-            if one_agent_done ==0 :
-                self.blue_team_buffers.replay_buffer.append(self.transition)
-            else:
-                one_agent_done = 0
+                    if done:
+                        action = None
+                    
+                self.env.step(action)
+                self.visualize()
+                self.update_buffer(agent, action)
+            
+            self.blue_team_buffers.replay_buffer.append(self.transition)
+            
             
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
 
@@ -287,7 +289,6 @@ class runner:
         self.env.reset()
         self.reset_buffers()
 
-        one_agent_done = 0
         for step in itertools.count():
 
             if step > self.args.VISUALIZE_AFTER:
@@ -302,36 +303,29 @@ class runner:
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
+                    if done:
+                        action = None
                     
                 else:
                     self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.online_nets[agent].act(self.blue_team_buffers.observation[agent])
                     if rnd_sample <= epsilon and self.args.GREEDY:
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
-                if done:
-                    self.env.step(None)
-                    self.visualize()
-                else:
-                    self.env.step(action)
-                    self.visualize()
-
-                if action == None:
-                    action = -1
-                done = self.update_buffer(agent, action)
-                if done or (action == -1 and self.is_opposing_team(agent) == False): #not taking into account transitions where an agent is done or where a blue agent took the None action, which is otherwise not available
-                    one_agent_done = 1
-                 #if one agent is done, all have to stop = not true in this environment ?
-            if one_agent_done == 0:
-                self.blue_team_buffers.replay_buffer.append(self.transition)
-            else:
-                one_agent_done = 0
+                    if done:
+                        action = None
+                    
+                self.env.step(action)
+                self.visualize()
+                self.update_buffer(agent, action)
+            
+            self.blue_team_buffers.replay_buffer.append(self.transition)
+            
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
         
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.env.reset()
                 writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
-                one_agent_done = 0
                 self.reset_buffers()
 
 
@@ -426,7 +420,7 @@ class runner:
                     time.sleep(self.args.WAIT_BETWEEN_STEPS)
                 else:
                     self.env.step(action)
-                    self.env.render()
+                    
                     time.sleep(self.args.WAIT_BETWEEN_STEPS)
 
                 if action == None:
@@ -438,6 +432,7 @@ class runner:
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.env.reset()
+                self.env.render()
                 print(f'Episode reward /agent: {self.blue_team_buffers.episode_reward}')
                 self.reset_buffers()
 
