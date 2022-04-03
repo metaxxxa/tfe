@@ -427,6 +427,7 @@ class runner_QMix:
                 
                 agent_nb = 0
                 for agent in self.args.blue_agents:
+                    ###
                     if agent in t: #check if agent was not done during the transition
 
                         obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][0]['obs'], dtype=torch.float32, device=device)
@@ -434,8 +435,10 @@ class runner_QMix:
                         rewards_t[transition_nb][agent_nb] = t[agent][2]
                         dones_t[transition_nb][agent_nb] = t[agent][3]
                         new_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32, device=device) #.detach()
-                        
-                        Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0], t[agent][5])[0].squeeze(0), 0,torch.tensor([t[agent][1]], device=device))
+                        if t[agent][1] == -1:
+                            Q_action_online_t[transition_nb][agent_nb] = 0
+                        else:
+                            Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0], t[agent][5])[0].squeeze(0), 0,torch.tensor([t[agent][1]], device=device))
                         Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0])[1]#.detach()
                         
                         agent_nb += 1
