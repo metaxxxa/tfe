@@ -43,11 +43,11 @@ class Args:
         self.GAMMA = 0.99
         self.EPSILON_START = 1
         self.EPSILON_END = 0.02
-        self.EPSILON_DECAY = 200000
+        self.EPSILON_DECAY = 500000
         self.SYNC_TARGET_FRAMES = 200
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
-        self.VISUALIZE_AFTER = 500000
+        self.VISUALIZE_AFTER = 5000000
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.1
         self.GREEDY = True
@@ -161,7 +161,7 @@ class QMixer(nn.Module):
         max_q_index = torch.argmax(q_values, dim=1)[0].detach().item()
         max_q = q_values[0,max_q_index]
         if all_q_values != None:
-            max_q_index = (all_q_values == max_q.item()).nonzero(as_tuple=True)[1].item()
+            max_q_index = (all_q_values == max_q.item()).nonzero(as_tuple=True)[1][0].item()
         return max_q_index, max_q
 
 
