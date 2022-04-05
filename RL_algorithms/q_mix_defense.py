@@ -14,6 +14,8 @@ import sys, getopt
 import time
 import re
 import pickle
+import cProfile 
+
 #importing the defense environment
 os.chdir('/home/jack/Documents/ERM/Master thesis/tfe')
 sys.path.insert(0, '/home/jack/Documents/ERM/Master thesis/tfe')
@@ -65,6 +67,8 @@ class Args:
         self.mixer_hidden_dim = 32
         self.mixer_hidden_dim2 = 32
         #environment specific parameters calculation
+        self.WINNING_REWARD = 1
+        self.LOSING_REWARD = -1
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
         self.ADVERSARY_TACTIC = 'random'
@@ -257,7 +261,7 @@ class runner_QMix:
             self.blue_team_buffers.observation[agent] = self.env.observe(agent)
             
             self.blue_team_buffers.episode_reward += reward
-            self.transition[agent] = (self.blue_team_buffers.observation_prev[agent], action,reward,done,self.blue_team_buffers.observation[agent],self.blue_team_buffers.hidden_state_prev[agent], self.blue_team_buffers.hidden_state[agent])
+            self.transition[agent] = [self.blue_team_buffers.observation_prev[agent], action,reward,done,self.blue_team_buffers.observation[agent],self.blue_team_buffers.hidden_state_prev[agent], self.blue_team_buffers.hidden_state[agent]]
             self.blue_team_buffers.observation_prev[agent] = self.blue_team_buffers.observation[agent]
             self.blue_team_buffers.hidden_state_prev[agent] = self.blue_team_buffers.hidden_state[agent]
             
@@ -282,6 +286,40 @@ class runner_QMix:
             self.blue_team_buffers.nb_transitions = 0
             for agent in self.args.all_agents:
                 self.reset_buffer(agent)
+    
+    def complete_transition(self):
+        if all([agent in self.transition for agent in self.args.blue_agents]):
+            return
+        else:
+            for agent in self.args.blue_agents:
+                if agent not in self.transition:  #done agents get 0 reward and keep same observation
+                    self.transition[agent] = [self.blue_team_buffers.observation_prev[agent], -1, 0, True,self.blue_team_buffers.observation[agent],self.blue_team_buffers.hidden_state_prev[agent], self.blue_team_buffers.hidden_state[agent]]
+    def winner_is_blue(self):
+        first_agent_in_list = [*self.env.infos][0]
+        if len(self.env.infos.keys()) == 1:
+            a = not self.is_opposing_team(first_agent_in_list)
+            return not self.is_opposing_team(first_agent_in_list)
+        else: 
+            if self.is_opposing_team(first_agent_in_list):
+                out = False
+            else:
+                out = True
+            winner = self.env.infos[first_agent_in_list].get('winner','is_a_tie')
+            if winner == 'self':
+                return out
+            elif winner == 'other':
+                return not out
+            elif winner == 'is_a_tie':
+                return False #a tie is considered a loss
+    def give_global_reward(self):
+        a,b,c,d = self.env.last()
+        if self.winner_is_blue() == True: #need to find win criterium, normally first agent in agents left is blue team . > ??? to verify
+            reward = self.args.WINNING_REWARD
+        else:
+            reward = self.args.LOSING_REWARD
+        for agent in self.transition:
+            self.transition[agent][2] = reward
+
     def is_opposing_team(self, agent):
         if re.match(rf'^{self.args.OPPOSING_TEAM}',agent):
             return True
@@ -315,7 +353,7 @@ class runner_QMix:
         if self.args.RUN_NAME != '':
             dirname = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") + f'step_{train_step}'
         else:
-            dirname = self.args.MODEL_DIR + '/' +datetime.now().strftime("%d%H%M%b%Y")
+            dirname = self.args.MODEL_DIR + '/' +datetime.now().strftime("%d%H%M%b%Y")+ f'step_{train_step}'
 
         if not os.path.exists(dirname):
             os.makedirs(dirname)
@@ -355,13 +393,13 @@ class runner_QMix:
                 self.transition = dict() #to store the transition 
                 self.step_buffer() #count the number of transitions per episode
                 for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
-
+                    a, b, c, d = self.env.last()
                     if self.is_opposing_team(agent):                   
                         self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                         action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
                         if done:
                             action = None
-                        
+                    
                     else:
                         self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
@@ -375,16 +413,17 @@ class runner_QMix:
 
                     #update buffer here
                     
-                self.blue_team_buffers.replay_buffer.append(self.transition)
                 
                 
+                self.complete_transition()
                 if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
-
+                    self.give_global_reward()
                     self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents) #
                     self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                     self.env.reset()
                     
                     self.reset_buffers()
+                self.blue_team_buffers.replay_buffer.append(self.transition)
         # trainingoptim
 
         self.env.reset()
@@ -420,16 +459,17 @@ class runner_QMix:
                 self.update_buffer(agent, action)
                 self.visualize()
             
-            self.blue_team_buffers.replay_buffer.append(self.transition)
-           
+            self.complete_transition()
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
-        
+                self.give_global_reward()
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.env.reset()
                 self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
                 self.reset_buffers()
 
+            self.blue_team_buffers.replay_buffer.append(self.transition)
+           
 
             
 
@@ -446,32 +486,20 @@ class runner_QMix:
                 
                 agent_nb = 0
                 for agent in self.args.blue_agents:
-                    ###
-                    if agent in t: #check if agent was not done during the transition
 
-                        obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][0]['obs'], dtype=torch.float32, device=device)
-                        actions_t[transition_nb][agent_nb] = t[agent][1]
-                        rewards_t[transition_nb][agent_nb] = t[agent][2]
-                        dones_t[transition_nb][agent_nb] = t[agent][3]
-                        new_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32, device=device) #.detach()
-                        if t[agent][1] == -1:
-                            Q_action_online_t[transition_nb][agent_nb] = 0
-                        else:
-                            Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0], t[agent][5])[0].squeeze(0), 0,torch.tensor([t[agent][1]], device=device))
-                        Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0])[1]#.detach()
-                        
-                        agent_nb += 1
-                    else: #in case the agent was done during the transition
-                        obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.zeros((self.args.observations_dim), dtype=torch.float32, device=device)
-                        actions_t[transition_nb][agent_nb] = -1
-                        rewards_t[transition_nb][agent_nb] = 0
-                        dones_t[transition_nb][agent_nb] = True
-                        new_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.zeros((self.args.observations_dim), dtype=torch.float32, device=device)
-                        
+                    obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][0]['obs'], dtype=torch.float32, device=device)
+                    actions_t[transition_nb][agent_nb] = t[agent][1]
+                    rewards_t[transition_nb][agent_nb] = t[agent][2]
+                    dones_t[transition_nb][agent_nb] = t[agent][3]
+                    new_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32, device=device) #.detach()
+                    if t[agent][1] == -1:
                         Q_action_online_t[transition_nb][agent_nb] = 0
-                        Q_ins_target_t[transition_nb][agent_nb] = 0
-                        
-                        agent_nb += 1
+                    else:
+                        Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0], t[agent][5])[0].squeeze(0), 0,torch.tensor([t[agent][1]], device=device))
+                    Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0])[1]#.detach()
+                    
+                    agent_nb += 1
+                    
 
 
                 transition_nb += 1
@@ -585,6 +613,8 @@ def main(argv):
             runner.run()
         elif opt in ("-e", "--eval_model"):
             runner.eval(arg)
+
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -52,9 +52,12 @@ class Args:
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.01
         self.GREEDY = True
+        #save and reload model
         self.SAVE_CYCLE = 50000
         self.MODEL_DIR = 'defense_params_dqn'
         self.RUN_NAME = ''
+        self.ITER_START_STEP = 0 #when starting training with an already trained model
+        self.MODEL_TO_LOAD = ''
         #agent network parameters
         self.dim_L1_agents_net = 32
         self.dim_L2_agents_net = 32
@@ -250,6 +253,9 @@ class runner:
         
         #Init replay buffer
         
+        if self.args.MODEL_TO_LOAD != '':
+            self.load_model(self.args.MODEL_TO_LOAD)
+            print('ok')
         self.env.reset()
 
         for _ in range(self.args.MIN_BUFFER_LENGTH):
@@ -402,7 +408,7 @@ class runner:
         self.reset_buffers()
         self.load_model(params_directory)
         self.transition = dict()
-        for step in itertools.count():
+        for step in itertools.count(start=self.args.ITER_START_STEP):
             
             self.step_buffer()
             for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
