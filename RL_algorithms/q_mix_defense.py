@@ -37,21 +37,21 @@ TERRAIN = 'flat_5x5_2v2'
 class Args:
     def __init__(self, env):
             
-        self.BUFFER_SIZE = 200
-        self.REW_BUFFER_SIZE = 100
-        self.LEARNING_RATE = 1e-4
+        self.BUFFER_SIZE = 2000
+        self.REW_BUFFER_SIZE = 1000
+        self.LEARNING_RATE = 1e-5
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 32
-        self.GAMMA = 0.99
+        self.GAMMA = 0.90
         self.EPSILON_START = 1
         self.EPSILON_END = 0.02
-        self.EPSILON_DECAY = 500000
-        self.SYNC_TARGET_FRAMES = 200
+        self.EPSILON_DECAY = 200000
+        self.SYNC_TARGET_FRAMES = 100
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
-        self.VISUALIZE_AFTER = 5000000
+        self.VISUALIZE_AFTER = 2000000
         self.VISUALIZE = False
-        self.WAIT_BETWEEN_STEPS = 0.1
+        self.WAIT_BETWEEN_STEPS = 0.0001
         self.GREEDY = True
         #saving models
         self.ITER_START_STEP = 0 #when starting training with an already trained model, 0 by default without model to load
@@ -71,7 +71,7 @@ class Args:
         self.LOSING_REWARD = -1
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
-        self.ADVERSARY_TACTIC = 'random'
+        self.ADVERSARY_TACTIC = 'passive'
         self.params(env)
 
     def params(self, env):  #environment specific parameters calculation
@@ -94,8 +94,6 @@ class Params:
         self.step = step
 
 def mask_array(array, mask):
-    int = np.ma.compressed(np.ma.masked_where(mask==0, array) )
-
     return np.ma.compressed(np.ma.masked_where(mask==0, array) )
 
 class QMixer(nn.Module):
@@ -161,11 +159,11 @@ class QMixer(nn.Module):
         q_values, hidden_state = self.get_agent_nets(agent)(obs_t, hidden_state)
         return q_values, hidden_state
 
-    def get_Q_max(self, q_values, all_q_values=None):
-        max_q_index = torch.argmax(q_values, dim=1)[0].detach().item()
-        max_q = q_values[0,max_q_index]
-        if all_q_values != None:
-            max_q_index = (all_q_values == max_q.item()).nonzero(as_tuple=True)[1][0].item()
+    def get_Q_max(self, masked_q_values, obs, all_q_values=None):
+        max_q_index = torch.argmax(masked_q_values, dim=1)[0].detach().item()
+        max_q = masked_q_values[0,max_q_index] 
+        if all_q_values != None: #only in case a mask is given
+            max_q_index = ((all_q_values == max_q.item()) * (obs['action_mask'] == 1)).nonzero(as_tuple=True)[1][0].item()
         return max_q_index, max_q
 
 
@@ -176,7 +174,7 @@ class QMixer(nn.Module):
             masked_q_val = torch.masked_select(q_values, torch.as_tensor(obs['action_mask'], dtype=torch.bool,device=device)).unsqueeze(0)
             if masked_q_val.numel() == 0:
                 return None, hidden_state
-            action, _ = self.get_Q_max(masked_q_val, q_values)
+            action, _ = self.get_Q_max(masked_q_val, obs, q_values)
             return action, hidden_state
     
         
@@ -197,10 +195,11 @@ class AgentRNN(nn.Module):
 
 class buffers:
     def __init__(self, env, args, agents):
-        self.observation_prev = dict()
+        
         self.observation = dict()
-        self.hidden_state_prev = dict()
+        self.observation_next = dict()
         self.hidden_state = dict()
+        self.hidden_state_next = dict()
         self.episode_reward = 0.0
         self.nb_transitions = 0
         self.replay_buffer = deque(maxlen=args.BUFFER_SIZE)
@@ -208,8 +207,7 @@ class buffers:
         self.loss_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
 
         for agent in agents:
-            self.observation_prev[agent] = env.observe(agent)
-            self.hidden_state_prev[agent] = torch.zeros(args.dim_L2_agents_net, device=device).unsqueeze(0)
+            self.observation[agent] = env.observe(agent)
             self.hidden_state[agent] = torch.zeros(args.dim_L2_agents_net, device=device).unsqueeze(0)
         
 
@@ -221,9 +219,6 @@ class runner_QMix:
         self.opposing_team_buffers = buffers(self.env, self.args, self.args.opposing_agents)
         self.online_net = QMixer(self.env, self.args)
         self.target_net = copy.deepcopy(self.online_net) #QMixer(self.env, self.args)
-
-        self.blue_team_buffers = buffers(self.env, self.args, self.args.blue_agents)
-        self.opposing_team_buffers = buffers(self.env, self.args, self.args.opposing_agents)
 
 
         #display model graphs in tensorboard
@@ -250,20 +245,20 @@ class runner_QMix:
             
         if self.is_opposing_team(agent):
             
-            self.opposing_team_buffers.observation[agent] = self.env.observe(agent)
+            self.opposing_team_buffers.observation_next[agent] = self.env.observe(agent)
             self.opposing_team_buffers.episode_reward += reward
             
-            #self.transition[agent] = (self.opposing_team_buffers.observation_prev[agent], action,reward,done,self.opposing_team_buffers.observation[agent],self.opposing_team_buffers.hidden_state_prev[agent], self.opposing_team_buffers.hidden_state[agent])
-            self.opposing_team_buffers.observation_prev[agent] = self.opposing_team_buffers.observation[agent]
-            #self.opposing_team_buffers.hidden_state_prev[agent] = self.opposing_team_buffers.hidden_state[agent]
+            #self.transition[agent] = (self.opposing_team_buffers.observation_next[agent], action,reward,done,self.opposing_team_buffers.observation[agent],self.opposing_team_buffers.hidden_state_next[agent], self.opposing_team_buffers.hidden_state[agent])
+            self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
+            #self.opposing_team_buffers.hidden_state[agent] = self.opposing_team_buffers.hidden_state_next[agent]
         else:
             
-            self.blue_team_buffers.observation[agent] = self.env.observe(agent)
+            self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
             
             self.blue_team_buffers.episode_reward += reward
-            self.transition[agent] = [self.blue_team_buffers.observation_prev[agent], action,reward,done,self.blue_team_buffers.observation[agent],self.blue_team_buffers.hidden_state_prev[agent], self.blue_team_buffers.hidden_state[agent]]
-            self.blue_team_buffers.observation_prev[agent] = self.blue_team_buffers.observation[agent]
-            self.blue_team_buffers.hidden_state_prev[agent] = self.blue_team_buffers.hidden_state[agent]
+            self.transition[agent] = [self.blue_team_buffers.observation[agent], action,reward,done,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
+            self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
+            self.blue_team_buffers.hidden_state[agent] = self.blue_team_buffers.hidden_state_next[agent]
             
         
     def step_buffer(self):
@@ -271,12 +266,12 @@ class runner_QMix:
         self.opposing_team_buffers.nb_transitions +=1
     def reset_buffer(self, agent):
         if self.is_opposing_team(agent):
-            self.opposing_team_buffers.observation_prev[agent] = self.env.observe(agent)
-            #self.opposing_team_buffers.hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
+            self.opposing_team_buffers.observation[agent] = self.env.observe(agent)
+            #self.opposing_team_buffers.hidden_state_next[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
 
         else:
-            self.blue_team_buffers.observation_prev[agent] = self.env.observe(agent)
-            self.blue_team_buffers.hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
+            self.blue_team_buffers.observation[agent] = self.env.observe(agent)
+            self.blue_team_buffers.hidden_state[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
 
     def reset_buffers(self):
             self.opposing_team_buffers.episode_reward = 0
@@ -293,11 +288,10 @@ class runner_QMix:
         else:
             for agent in self.args.blue_agents:
                 if agent not in self.transition:  #done agents get 0 reward and keep same observation
-                    self.transition[agent] = [self.blue_team_buffers.observation_prev[agent], -1, 0, True,self.blue_team_buffers.observation[agent],self.blue_team_buffers.hidden_state_prev[agent], self.blue_team_buffers.hidden_state[agent]]
+                    self.transition[agent] = [self.blue_team_buffers.observation[agent], -1, 0, True,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
     def winner_is_blue(self):
         first_agent_in_list = [*self.env.infos][0]
         if len(self.env.infos.keys()) == 1:
-            a = not self.is_opposing_team(first_agent_in_list)
             return not self.is_opposing_team(first_agent_in_list)
         else: 
             if self.is_opposing_team(first_agent_in_list):
@@ -312,7 +306,7 @@ class runner_QMix:
             elif winner == 'is_a_tie':
                 return False #a tie is considered a loss
     def give_global_reward(self):
-        a,b,c,d = self.env.last()
+
         if self.winner_is_blue() == True: #need to find win criterium, normally first agent in agents left is blue team . > ??? to verify
             reward = self.args.WINNING_REWARD
         else:
@@ -380,6 +374,66 @@ class runner_QMix:
             self.loading_parameters = pickle.load(f)
         self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
 
+    def train(self, step):
+          
+        transitions = random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
+        obses_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
+        actions_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
+        Q_ins_target_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
+        Q_action_online_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
+        rewards_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
+        dones_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
+        next_obses_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
+        transition_nb = 0
+        for t in transitions:
+            
+            agent_nb = 0
+            for agent in self.args.blue_agents:
+
+                obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][0]['obs'], dtype=torch.float32, device=device)
+                actions_t[transition_nb][agent_nb] = t[agent][1]
+                rewards_t[transition_nb][agent_nb] = t[agent][2]
+                dones_t[transition_nb][agent_nb] = t[agent][3]
+                next_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32, device=device) #.detach()
+                if t[agent][1] == -1:
+                    Q_action_online_t[transition_nb][agent_nb] = 0
+                else:
+                    Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0], t[agent][5])[0].squeeze(0), 0,torch.tensor([t[agent][1]], device=device))
+                Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0], t[agent][4])[1]#.detach()
+                
+                agent_nb += 1
+                
+
+
+            transition_nb += 1
+
+        #compute reward for all agents
+        rewards_t = rewards_t.mean(1)
+        #if one agent is done all are
+        dones_t = dones_t.sum(1)
+        dones_t = dones_t > 0
+        # targets
+        Qtot_max_target = self.target_net.forward(next_obses_t, Q_ins_target_t).detach()
+        Qtot_online = self.online_net.forward(obses_t, Q_action_online_t)
+        y_tot = rewards_t + self.args.GAMMA*(1 + (-1)*dones_t)*Qtot_max_target
+
+    ########### busy
+        # loss 
+        error = y_tot + (-1)*Qtot_online
+        
+        loss = error**2
+        mean_loss = torch.mean(loss)
+        loss = loss.sum()
+        self.blue_team_buffers.loss_buffer.append(mean_loss.item())  # detach ?????????????????
+        self.writer.add_scalar("Loss", mean_loss.item(), step)
+        
+
+
+        # gradient descent
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
     def run(self):
         
         #Init replay buffer
@@ -393,7 +447,6 @@ class runner_QMix:
                 self.transition = dict() #to store the transition 
                 self.step_buffer() #count the number of transitions per episode
                 for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
-                    a, b, c, d = self.env.last()
                     if self.is_opposing_team(agent):                   
                         self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                         action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
@@ -405,7 +458,7 @@ class runner_QMix:
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
                         if done:
                             action = None
-                        _, self.blue_team_buffers.hidden_state[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state_prev[agent])
+                        _, self.blue_team_buffers.hidden_state_next[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
                     
                     self.env.step(action)
                     self.update_buffer(agent, action)
@@ -449,7 +502,7 @@ class runner_QMix:
                     
                 else:
                     self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
-                    action, self.blue_team_buffers.hidden_state[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state_prev[agent])
+                    action, self.blue_team_buffers.hidden_state[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
                     if rnd_sample <= epsilon and self.args.GREEDY:
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
                     if done:
@@ -467,69 +520,10 @@ class runner_QMix:
                 self.env.reset()
                 self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
                 self.reset_buffers()
-
+                self.train(step) #training only after each episode
             self.blue_team_buffers.replay_buffer.append(self.transition)
-           
-
+         
             
-
-            transitions = random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
-            obses_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
-            actions_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
-            Q_ins_target_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
-            Q_action_online_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
-            rewards_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
-            dones_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
-            new_obses_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
-            transition_nb = 0
-            for t in transitions:
-                
-                agent_nb = 0
-                for agent in self.args.blue_agents:
-
-                    obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][0]['obs'], dtype=torch.float32, device=device)
-                    actions_t[transition_nb][agent_nb] = t[agent][1]
-                    rewards_t[transition_nb][agent_nb] = t[agent][2]
-                    dones_t[transition_nb][agent_nb] = t[agent][3]
-                    new_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32, device=device) #.detach()
-                    if t[agent][1] == -1:
-                        Q_action_online_t[transition_nb][agent_nb] = 0
-                    else:
-                        Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0], t[agent][5])[0].squeeze(0), 0,torch.tensor([t[agent][1]], device=device))
-                    Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0])[1]#.detach()
-                    
-                    agent_nb += 1
-                    
-
-
-                transition_nb += 1
-
-            #compute reward for all agents
-            rewards_t = rewards_t.mean(1)
-            #if one agent is done all are
-            dones_t = dones_t.sum(1)
-            dones_t = dones_t > 0
-            # targets
-            Qtot_max_target = self.target_net.forward(new_obses_t, Q_ins_target_t).detach()
-            Qtot_online = self.online_net.forward(obses_t, Q_action_online_t)
-            y_tot = rewards_t + self.args.GAMMA*(1 + (-1)*dones_t)*Qtot_max_target
-
-        ########### busy
-            # loss 
-            error = y_tot + (-1)*Qtot_online
-            
-            loss = error**2
-            mean_loss = torch.mean(loss)
-            loss = loss.sum()
-            self.blue_team_buffers.loss_buffer.append(mean_loss.item())  # detach ?????????????????
-            self.writer.add_scalar("Loss", mean_loss.item(), step)
-            
-
-
-            # gradient descent
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
             #self.scheduler.step(np.mean(self.loss_buffer))
             #update target network
 
@@ -570,7 +564,7 @@ class runner_QMix:
                     
                 else:
                     self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
-                    action, self.blue_team_buffers.hidden_state[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state_prev[agent])
+                    action, self.blue_team_buffers.hidden_state[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
                     if done:
                         action = None
                     

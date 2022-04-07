@@ -111,12 +111,11 @@ class DQN(nn.Module):
         q_values = self.net(obs_t.unsqueeze(0))
         return q_values
 
-    def get_Q_max(self, q_values, all_q_values=None):
-        int = torch.argmax(q_values, dim=-1)
+    def get_Q_max(self, q_values, obs, all_q_values=None):
         max_q_index = torch.argmax(q_values, dim=-1).detach().item()
         max_q = q_values[max_q_index]
         if all_q_values != None:
-            max_q_index = (all_q_values == max_q.item()).nonzero(as_tuple=True)[1][0].item()
+            max_q_index = ((all_q_values == max_q.item()) * (obs['action_mask'] == 1)).nonzero(as_tuple=True)[1][0].item()
         return max_q_index, max_q
 
 
@@ -127,7 +126,7 @@ class DQN(nn.Module):
             masked_q_val = torch.masked_select(q_values, torch.as_tensor(obs['action_mask'], dtype=torch.bool,device=device))
             if masked_q_val.numel() == 0:
                 return None
-            action, _ = self.get_Q_max(masked_q_val, q_values)
+            action, _ = self.get_Q_max(masked_q_val, obs, q_values)
             return action
     
         
@@ -136,8 +135,8 @@ class DQN(nn.Module):
 
 class buffers:
     def __init__(self, env, args, agents):
-        self.observation_prev = dict()
         self.observation = dict()
+        self.observation_next = dict()
         self.episode_reward = 0.0
         self.nb_transitions = 0
         self.replay_buffer = deque(maxlen=args.BUFFER_SIZE)
@@ -145,7 +144,7 @@ class buffers:
         self.loss_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
 
         for agent in agents:
-            self.observation_prev[agent] = env.observe(agent)
+            self.observation[agent] = env.observe(agent)
 
 class runner:
     def __init__(self, env, args):
@@ -180,16 +179,16 @@ class runner:
             done = self.env.dones[agent]
             
         if self.is_opposing_team(agent):
-            self.opposing_team_buffers.observation[agent] = self.env.observe(agent)
+            self.opposing_team_buffers.observation_next[agent] = self.env.observe(agent)
             self.opposing_team_buffers.episode_reward += reward
-            
-            self.opposing_team_buffers.observation_prev[agent] = self.opposing_team_buffers.observation[agent]
+            #store transition ?
+            self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
         else:
-            self.blue_team_buffers.observation[agent] = self.env.observe(agent)
+            self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
             self.blue_team_buffers.episode_reward += reward
             
-            self.transition[agent] = (self.blue_team_buffers.observation_prev[agent], action,reward,done,self.blue_team_buffers.observation[agent])
-            self.blue_team_buffers.observation_prev[agent] = self.blue_team_buffers.observation[agent]
+            self.transition[agent] = (self.blue_team_buffers.observation[agent], action,reward,done,self.blue_team_buffers.observation_next[agent])
+            self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
             
         return done
     def step_buffer(self):
@@ -197,10 +196,10 @@ class runner:
         self.opposing_team_buffers.nb_transitions +=1
     def reset_buffer(self, agent):
         if self.is_opposing_team(agent):
-            self.opposing_team_buffers.observation_prev[agent] = self.env.observe(agent)
+            self.opposing_team_buffers.observation[agent] = self.env.observe(agent)
             
         else:
-            self.blue_team_buffers.observation_prev[agent] = self.env.observe(agent)
+            self.blue_team_buffers.observation[agent] = self.env.observe(agent)
 
     def reset_buffers(self):
             self.opposing_team_buffers.episode_reward = 0
@@ -368,8 +367,9 @@ class runner:
 
                 action_q_values = torch.gather(input=q_values, dim=1, index=actions_t)
 
-                loss = nn.functional.smooth_l1_loss(action_q_values, targets)
-
+                error = targets - action_q_values
+                loss = error**2
+                loss = loss.sum()
                 # gradient descent
                 self.online_nets[agent].optimizer.zero_grad()
                 loss.backward()
