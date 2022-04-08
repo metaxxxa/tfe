@@ -7,14 +7,11 @@ import numpy as np
 from collections import deque
 import itertools
 import random
-from torch.utils.tensorboard import SummaryWriter
 import copy
 import os
 import sys, getopt
-import time
 import re
 import pickle
-import cProfile 
 
 #importing the defense environment
 os.chdir('/home/jack/Documents/ERM/Master thesis/tfe')
@@ -53,6 +50,8 @@ class Args:
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.0001
         self.GREEDY = True
+        #logging
+        self.TENSORBOARD = True
         #saving models
         self.ITER_START_STEP = 0 #when starting training with an already trained model, 0 by default without model to load
         self.MODEL_TO_LOAD = ''
@@ -222,10 +221,12 @@ class runner_QMix:
 
 
         #display model graphs in tensorboard
-        self.writer = SummaryWriter()
-        args.log_params(self.writer)
-        self.writer.add_graph(self.online_net.get_agent_nets(self.args.blue_agents[0]),(torch.empty((self.args.observations_dim),device=device), torch.empty((1, self.args.dim_L2_agents_net),device=device)) )
-        self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
+        if self.args.TENSORBOARD:
+            from torch.utils.tensorboard import SummaryWriter
+            self.writer = SummaryWriter()
+            args.log_params(self.writer)
+            self.writer.add_graph(self.online_net.get_agent_nets(self.args.blue_agents[0]),(torch.empty((self.args.observations_dim),device=device), torch.empty((1, self.args.dim_L2_agents_net),device=device)) )
+            self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
 , torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
         self.sync_networks()
         self.optimizer = torch.optim.Adam(self.online_net.net_params, lr = self.args.LEARNING_RATE)
@@ -425,7 +426,8 @@ class runner_QMix:
         mean_loss = torch.mean(loss)
         loss = loss.sum()
         self.blue_team_buffers.loss_buffer.append(mean_loss.item())  # detach ?????????????????
-        self.writer.add_scalar("Loss", mean_loss.item(), step)
+        if self.args.TENSORBOARD:
+            self.writer.add_scalar("Loss", mean_loss.item(), step)
         
 
 
@@ -518,7 +520,8 @@ class runner_QMix:
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.env.reset()
-                self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
+                if self.args.TENSORBOARD:
+                    self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
                 self.reset_buffers()
                 #self.train(step) #training only after each episode
             self.blue_team_buffers.replay_buffer.append(self.transition)
@@ -540,7 +543,8 @@ class runner_QMix:
                 print('\n Step', step )
                 print('Avg Episode Reward /agent ', np.mean(self.blue_team_buffers.rew_buffer))
                 print('Avg Loss over a batch', np.mean(self.blue_team_buffers.loss_buffer))
-        self.writer.close() 
+        if self.args.TENSORBOARD:
+            self.writer.close() 
 
     
         ###
