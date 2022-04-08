@@ -43,7 +43,7 @@ class Args:
         self.GAMMA = 0.95
         self.EPSILON_START = 1
         self.EPSILON_END = 0.02
-        self.EPSILON_DECAY = 500000
+        self.EPSILON_DECAY = 200000
         self.SYNC_TARGET_FRAMES = 200
         #visualization parameters
         self.PRINT_LOGS = False
@@ -65,7 +65,7 @@ class Args:
         #environment specific parameters calculation
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
-        self.ADVERSARY_TACTIC = 'passive'
+        self.ADVERSARY_TACTIC = 'random'
         self.params(env)
 
     def params(self, env):  #environment specific parameters calculation
@@ -79,7 +79,7 @@ class Args:
         self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.n_actions = env.action_space(agent).n
     def log_params(self, writer):
-        hparams = {'envparam/terrrain': TERRAIN,'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0)))}
+        hparams = {'envparam/terrrain': TERRAIN,'Adversary tactic':self.ADVERSARY_TACTIC , 'Algorithm': 'DQN' , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0)))}
         metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net}
         writer.add_hparams(hparams, metric_dict)
 
@@ -234,9 +234,9 @@ class runner:
     def save_model(self, train_step):  #taken from https://github.com/koenboeckx/qmix/blob/main/qmix.py to save learnt model
         num = str(train_step // self.args.SAVE_CYCLE)
         if self.args.RUN_NAME != '':
-            dirname = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") + '/agent_dqn_params/'
+            dirname = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") +f'step_{train_step}'+ '/agent_dqn_params/'
         else:
-            dirname = self.args.MODEL_DIR + '/' +datetime.now().strftime("%d%H%M%b%Y")+ '/agent_dqn_params/'
+            dirname = self.args.MODEL_DIR + '/' +datetime.now().strftime("%d%H%M%b%Y")+ f'step_{train_step}' + '/agent_dqn_params/'
 
         if not os.path.exists(dirname):
             os.makedirs(dirname)
@@ -393,7 +393,7 @@ class runner:
                 self.save_model(step)
 
             #logging
-            if step % self.args.REW_BUFFER_SIZE == 0 and self.args.PRINT_LOGS:
+            if  self.args.PRINT_LOGS and step % self.args.REW_BUFFER_SIZE == 0:
                 print('\n Step', step )
                 print('Avg Episode Reward /agent ', np.mean(self.blue_team_buffers.rew_buffer))
                 print('Avg Loss over a batch', np.mean(self.blue_team_buffers.loss_buffer))
