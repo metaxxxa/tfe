@@ -37,15 +37,15 @@ TERRAIN = 'flat_5x5'
 class Args:
     def __init__(self, env):
             
-        self.BUFFER_SIZE = 2000
+        self.BUFFER_SIZE = 200
         self.REW_BUFFER_SIZE = 1000
-        self.LEARNING_RATE = 1e-3
+        self.LEARNING_RATE = 0.5e-4
         self.MIN_BUFFER_LENGTH = 300
-        self.BATCH_SIZE = 96
+        self.BATCH_SIZE = 32
         self.GAMMA = 0.95
         self.EPSILON_START = 1
-        self.EPSILON_END = 0.02
-        self.EPSILON_DECAY = 200000
+        self.EPSILON_END = 0.01
+        self.EPSILON_DECAY = 500000
         self.SYNC_TARGET_FRAMES = 200
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
@@ -85,7 +85,7 @@ class Args:
         self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.n_actions = env.action_space(agent).n
     def log_params(self, writer):
-        hparams = {'envparam/terrrain': TERRAIN, 'Adversary tactic' : self.ADVERSARY_TACTIC, 'Algorithm': 'QMIX' , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0))), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
+        hparams = {'envparam/terrrain': TERRAIN, 'Adversary tactic' : self.ADVERSARY_TACTIC, 'Algorithm': 'QMIX_gru' , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0))), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
         metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net, 'hparam/mixer hidden dim 1': self.mixer_hidden_dim, 'hparam/mixer hidden dim 2': self.mixer_hidden_dim2}
         writer.add_hparams(hparams, metric_dict)
 
@@ -311,7 +311,7 @@ class runner_QMix:
             reward = self.args.WINNING_REWARD
         else:
             reward = self.args.LOSING_REWARD
-        for agent in self.transition:
+        for agent in self.transition.keys():
             self.transition[agent][2] = reward
 
     def is_opposing_team(self, agent):
@@ -341,7 +341,7 @@ class runner_QMix:
             self.env.render()
 
     def save_model(self, train_step):  #taken from https://github.com/koenboeckx/qmix/blob/main/qmix.py to save learnt model
-        num = str(train_step // self.args.SAVE_CYCLE)
+
         params = Params(train_step)
         params.blue_team_replay_buffer = self.blue_team_buffers.replay_buffer
         if self.args.RUN_NAME != '':
@@ -394,12 +394,12 @@ class runner_QMix:
                 actions_t[transition_nb][agent_nb] = t[agent][1]
                 rewards_t[transition_nb][agent_nb] = t[agent][2]
                 dones_t[transition_nb][agent_nb] = t[agent][3]
-                next_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32, device=device).detach()
+                next_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32, device=device)#.detach()
                 if t[agent][1] == -1:
                     Q_action_online_t[transition_nb][agent_nb] = 0
                 else:
                     Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0], t[agent][5])[0].squeeze(0), 0,torch.tensor([t[agent][1]], device=device))
-                Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0], t[agent][4])[1].detach()
+                Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0], t[agent][4])[1]#.detach()
                 
                 agent_nb += 1
                 
@@ -522,7 +522,7 @@ class runner_QMix:
                 self.reset_buffers()
                 self.train(step) #training only after each episode
             self.blue_team_buffers.replay_buffer.append(self.transition)
-         
+            #self.train(step)  #training at each step
             
             #self.scheduler.step(np.mean(self.loss_buffer))
             #update target network
