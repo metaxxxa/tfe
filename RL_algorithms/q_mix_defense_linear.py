@@ -25,14 +25,14 @@ if torch.cuda.is_available():
   dev = "cuda:0" 
 else:  
   dev = "cpu"  
-  
+dev = "cpu"
 device = torch.device(dev) 
 
 
 #environment constants
 EPISODE_MAX_LENGTH = 200
 MAX_DISTANCE = 5
-TERRAIN = 'flat_5x5_2v2'
+TERRAIN = 'flat_5x5'
 #parameters
 class Args:
     def __init__(self, env):
@@ -40,7 +40,7 @@ class Args:
         self.BUFFER_SIZE = 20000
         self.REW_BUFFER_SIZE = 1000
         self.LEARNING_RATE = 5e-4
-        self.MIN_BUFFER_LENGTH = 300
+        self.MIN_BUFFER_LENGTH = 3000
         self.BATCH_SIZE = 1000
         self.GAMMA = 0.99
         self.EPSILON_START = 1
@@ -165,7 +165,7 @@ class QMixer(nn.Module):
         max_q_index = torch.argmax(masked_q_values, dim=-1).detach().item()
         max_q = masked_q_values[max_q_index] 
         if all_q_values != None: #only in case a mask is given
-            max_q_index = ((all_q_values == max_q.item()) * (obs['action_mask'] == 1)).nonzero(as_tuple=True)[0][0].item()
+            max_q_index = ((all_q_values == max_q.item()).cpu() * (obs['action_mask'] == 1)).nonzero(as_tuple=True)[0][0].item()
         return max_q_index, max_q
 
 

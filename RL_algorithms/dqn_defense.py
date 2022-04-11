@@ -52,6 +52,8 @@ class Args:
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.01
         self.GREEDY = True
+        #logging
+        self.TENSORBOARD = True
         #save and reload model
         self.SAVE_CYCLE = 50000
         self.MODEL_DIR = 'defense_params_dqn'
@@ -63,6 +65,8 @@ class Args:
         self.dim_L2_agents_net = 32
         self.hidden_layer1_dim = 64
         #environment specific parameters calculation
+        self.WINNING_REWARD = 1
+        self.LOSING_REWARD = -1
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
         self.ADVERSARY_TACTIC = 'random'
@@ -112,10 +116,12 @@ class DQN(nn.Module):
         return q_values
 
     def get_Q_max(self, q_values, obs, all_q_values=None):
+        if len(q_values) == 0:
+            return -1, torch.tensor([0])
         max_q_index = torch.argmax(q_values, dim=-1).detach().item()
         max_q = q_values[max_q_index]
         if all_q_values != None:
-            max_q_index = ((all_q_values == max_q.item()) * (obs['action_mask'] == 1)).nonzero(as_tuple=True)[1][0].item()
+            max_q_index = ((all_q_values == max_q.item()).cpu() * (obs['action_mask'] == 1)).nonzero(as_tuple=True)[1][0].item()
         return max_q_index, max_q
 
 
@@ -187,7 +193,7 @@ class runner:
             self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
             self.blue_team_buffers.episode_reward += reward
             
-            self.transition[agent] = (self.blue_team_buffers.observation[agent], action,reward,done,self.blue_team_buffers.observation_next[agent])
+            self.transition[agent] = [self.blue_team_buffers.observation[agent], action,reward,done,self.blue_team_buffers.observation_next[agent]]
             self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
             
         return done
@@ -209,6 +215,38 @@ class runner:
             self.blue_team_buffers.nb_transitions = 0
             for agent in self.args.all_agents:
                 self.reset_buffer(agent)
+    def complete_transition(self):
+        if all([agent in self.transition for agent in self.args.blue_agents]):
+            return
+        else:
+            for agent in self.args.blue_agents:
+                if agent not in self.transition:  #done agents get 0 reward and keep same observation
+                    self.transition[agent] = [self.blue_team_buffers.observation[agent], -1, -0.01, True,self.blue_team_buffers.observation_next[agent]]
+    def winner_is_blue(self):
+        first_agent_in_list = [*self.env.infos][0]
+        if len(self.env.infos.keys()) == 1:
+            return not self.is_opposing_team(first_agent_in_list)
+        else: 
+            if self.is_opposing_team(first_agent_in_list):
+                out = False
+            else:
+                out = True
+            winner = self.env.infos[first_agent_in_list].get('winner','is_a_tie')
+            if winner == 'self':
+                return out
+            elif winner == 'other':
+                return not out
+            elif winner == 'is_a_tie':
+                return False #a tie is considered a loss
+    def give_global_reward(self):
+
+        if self.winner_is_blue() == True: #need to find win criterium, normally first agent in agents left is blue team . > ??? to verify
+            reward = self.args.WINNING_REWARD
+        else:
+            reward = self.args.LOSING_REWARD
+        for agent in self.transition:
+            self.transition[agent][2] = reward
+
     def is_opposing_team(self, agent):
         if re.match(rf'^{self.args.OPPOSING_TEAM}',agent):
             return True
@@ -279,16 +317,16 @@ class runner:
                 self.visualize()
                 self.update_buffer(agent, action)
             
-            self.blue_team_buffers.replay_buffer.append(self.transition)
             
-            
+            #self.complete_transition()
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
-
+                #self.give_global_reward()
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents) #
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.env.reset()
                 
                 self.reset_buffers()
+            self.blue_team_buffers.replay_buffer.append(self.transition)
         # trainingoptim
 
         self.env.reset()
@@ -323,48 +361,50 @@ class runner:
                 self.visualize()
                 self.update_buffer(agent, action)
             
-            self.blue_team_buffers.replay_buffer.append(self.transition)
-            
+            #self.complete_transition()
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
-        
+                #self.give_global_reward()
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.env.reset()
                 writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
                 self.reset_buffers()
 
-
+            self.blue_team_buffers.replay_buffer.append(self.transition)
+            
             
 
             transitions = random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
             loss_sum = 0
             for agent in self.args.blue_agents:
         
-
+                
                 obses = np.asarray([t[agent][0]['obs'] for t in transitions])
                 actions = np.asarray([t[agent][1] for t in transitions])
                 rews = np.asarray([ t[agent][2] for t in transitions])
                 dones = np.asarray([t[agent][3] for t in transitions])
-                new_obses = np.asarray([t[agent][4]['obs'] for t in transitions])
+                #new_obses = np.asarray([t[agent][4]['obs'] for t in transitions])
+                max_target_q_values = np.asarray([self.target_nets[agent].get_Q_max(torch.masked_select(self.target_nets[agent].get_Q_values(t[agent][4]), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.target_nets[agent].get_Q_values(t[agent][4]))[1].detach().item() for t in transitions])
 
                 obses_t = torch.as_tensor(obses, dtype=torch.float32)
                 actions_t = torch.as_tensor(actions, dtype=torch.int64).unsqueeze(-1)
                 rews_t = torch.as_tensor(rews, dtype=torch.float32).unsqueeze(-1)
                 dones_t = torch.as_tensor(dones, dtype=torch.float32).unsqueeze(-1)
-                new_obses_t = torch.as_tensor(new_obses, dtype=torch.float32)
-
+                #new_obses_t = torch.as_tensor(new_obses, dtype=torch.float32)
+                max_target_q_values_t = torch.as_tensor(max_target_q_values, dtype=torch.float32)
                 # targets
+                
+                #self.target_nets[agent].get_q_max(torch.masked_select(self.target_nets[agent](torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32)), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.target_nets[agent](torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32)))
+                #masked_target_q_values = 
+                #max_target_q_values = target_q_values.max(dim=1, keepdim=True)[0]
 
-                target_q_values = self.target_nets[agent](new_obses_t)
-                max_target_q_values = target_q_values.max(dim=1, keepdim=True)[0]
-
-                targets = rews_t + self.args.GAMMA*(1 - dones_t)*max_target_q_values
+                targets = rews_t + self.args.GAMMA*(1 - dones_t)*max_target_q_values_t
 
 
                 # loss 
                 
                 q_values = self.online_nets[agent](obses_t)
-
+            
                 action_q_values = torch.gather(input=q_values, dim=1, index=actions_t)
 
                 error = targets - action_q_values
