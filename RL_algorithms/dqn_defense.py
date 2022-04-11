@@ -6,12 +6,13 @@ import numpy as np
 from collections import deque
 import itertools
 import random
-from torch.utils.tensorboard import SummaryWriter
 import copy
 import os
 import sys
 import time
 import re
+import getopt
+import pickle
 #importing the defense environment
 os.chdir('/home/jack/Documents/ERM/Master thesis/tfe')
 sys.path.insert(0, '/home/jack/Documents/ERM/Master thesis/tfe')
@@ -21,11 +22,10 @@ if torch.cuda.is_available():
   dev = "cuda:0" 
 else:  
   dev = "cpu"  
-  
+dev = "cpu"  #if cpu faster than gpu 
 device = torch.device(dev) 
 
-#setting up TensorBoard
-writer = SummaryWriter()
+
 
 #environment constants
 EPISODE_MAX_LENGTH = 200
@@ -36,7 +36,7 @@ class Args:
     def __init__(self, env):
             
         self.BUFFER_SIZE = 200
-        self.REW_BUFFER_SIZE = 100
+        self.REW_BUFFER_SIZE = 10000
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 32
@@ -82,10 +82,11 @@ class Args:
         self.nb_inputs_agent = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.n_actions = env.action_space(agent).n
-    def log_params(self, writer):
+    def log_params(self, writer=None):
         hparams = {'envparam/terrrain': TERRAIN,'Adversary tactic':self.ADVERSARY_TACTIC , 'Algorithm': 'DQN' , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0)))}
         metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net}
-        writer.add_hparams(hparams, metric_dict)
+        if self.TENSORBOARD:
+            writer.add_hparams(hparams, metric_dict)
 
 def mask_array(array, mask):
     int = np.ma.compressed(np.ma.masked_where(mask==0, array) )
@@ -117,7 +118,7 @@ class DQN(nn.Module):
 
     def get_Q_max(self, q_values, obs, all_q_values=None):
         if len(q_values) == 0:
-            return -1, torch.tensor([0])
+            return -1, torch.tensor([0],device=device)
         max_q_index = torch.argmax(q_values, dim=-1).detach().item()
         max_q = q_values[max_q_index]
         if all_q_values != None:
@@ -165,8 +166,13 @@ class runner:
             self.online_nets[agent] = DQN(self.env, self.args, self.env.observation_space(agent).spaces['obs'].shape, self.env.action_space(agent).n)
 
         self.target_nets = copy.deepcopy(self.online_nets)
-        #display model graphs in tensorboard
-        writer.add_graph(self.online_nets[self.args.blue_agents[0]],torch.empty((self.args.observations_dim),device=device) )
+        if self.args.TENSORBOARD:
+            #setting up TensorBoard
+            from torch.utils.tensorboard import SummaryWriter
+            self.writer = SummaryWriter()
+            args.log_params(self.writer)
+                #display model graphs in tensorboard
+            self.writer.add_graph(self.online_nets[self.args.blue_agents[0]],torch.empty((self.args.observations_dim),device=device) )
         
         self.sync_networks()
         
@@ -367,7 +373,8 @@ class runner:
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.env.reset()
-                writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
+                if self.args.TENSORBOARD:
+                    self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
                 self.reset_buffers()
 
             self.blue_team_buffers.replay_buffer.append(self.transition)
@@ -386,12 +393,12 @@ class runner:
                 #new_obses = np.asarray([t[agent][4]['obs'] for t in transitions])
                 max_target_q_values = np.asarray([self.target_nets[agent].get_Q_max(torch.masked_select(self.target_nets[agent].get_Q_values(t[agent][4]), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.target_nets[agent].get_Q_values(t[agent][4]))[1].detach().item() for t in transitions])
 
-                obses_t = torch.as_tensor(obses, dtype=torch.float32)
-                actions_t = torch.as_tensor(actions, dtype=torch.int64).unsqueeze(-1)
-                rews_t = torch.as_tensor(rews, dtype=torch.float32).unsqueeze(-1)
-                dones_t = torch.as_tensor(dones, dtype=torch.float32).unsqueeze(-1)
+                obses_t = torch.as_tensor(obses, dtype=torch.float32,device=device)
+                actions_t = torch.as_tensor(actions, dtype=torch.int64,device=device).unsqueeze(-1)
+                rews_t = torch.as_tensor(rews, dtype=torch.float32,device=device).unsqueeze(-1)
+                dones_t = torch.as_tensor(dones, dtype=torch.float32,device=device).unsqueeze(-1)
                 #new_obses_t = torch.as_tensor(new_obses, dtype=torch.float32)
-                max_target_q_values_t = torch.as_tensor(max_target_q_values, dtype=torch.float32)
+                max_target_q_values_t = torch.as_tensor(max_target_q_values, dtype=torch.float32,device=device)
                 # targets
                 
                 #self.target_nets[agent].get_q_max(torch.masked_select(self.target_nets[agent](torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32)), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.target_nets[agent](torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32)))
@@ -419,7 +426,8 @@ class runner:
 
             loss_sum = loss_sum/self.args.n_blue_agents
             self.blue_team_buffers.loss_buffer.append(loss_sum)  # detach ?????????????????
-            writer.add_scalar("Loss /agent", loss_sum, step)
+            if self.args.TENSORBOARD:
+                self.writer.add_scalar("Loss /agent", loss_sum, step)
             
 
 
@@ -437,7 +445,8 @@ class runner:
                 print('\n Step', step )
                 print('Avg Episode Reward /agent ', np.mean(self.blue_team_buffers.rew_buffer))
                 print('Avg Loss over a batch', np.mean(self.blue_team_buffers.loss_buffer))
-        writer.close() 
+        if self.args.TENSORBOARD:
+            self.writer.close() 
 
     
         ###
@@ -489,10 +498,38 @@ if __name__ == "__main__":
     env = defense_v0.env(terrain=TERRAIN, max_cycles=EPISODE_MAX_LENGTH, max_distance=MAX_DISTANCE )
     env.reset()
     args = Args(env)
-    args.log_params(writer)
     runner = runner(env, args)
     if len(sys.argv) == 1:
         runner.run()
     else:
         runner.eval(sys.argv[1])
 
+def main(argv):
+    env = defense_v0.env(terrain=TERRAIN, max_cycles=EPISODE_MAX_LENGTH, max_distance=MAX_DISTANCE )
+    env.reset()
+    args = Args(env)
+    args.log_params(writer)
+    runner = runner(env, args)
+    try:
+        opts, args = getopt.getopt(argv,"hl:e:",["load_model=","eval_model="])
+    except getopt.GetoptError:
+        print('error')
+    if len(argv) == 0:
+        runner.run()
+    for opt, arg in opts:
+        if opt == '-h':
+            print('dqn.py')
+            print ('dqn.py -l <model_folder_to_load>')
+            print('OR')
+            print('dqn.py  -e <model_folder_to_eval> <folder_to_save_metrics>')
+            sys.exit()
+        elif opt in ("-l", "--load_model"):
+            runner.args.MODEL_TO_LOAD = arg
+            runner.run()
+        elif opt in ("-e", "--eval_model"):
+            runner.eval(arg)
+
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
