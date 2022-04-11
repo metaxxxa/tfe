@@ -31,6 +31,16 @@ device = torch.device(dev)
 EPISODE_MAX_LENGTH = 200
 MAX_DISTANCE = 5
 TERRAIN = 'central_5x5'
+
+#to log results
+class Metrics:
+    def __init__(self, nb_episodes):
+        self.nb_episodes = nb_episodes
+        self.rewards_buffer = deque(maxlen=nb_episodes)
+        self.wins = deque(maxlen=nb_episodes)
+        self.nb_steps = deque(maxlen=nb_episodes)
+        self.env = ''
+        
 #parameters
 class Args:
     def __init__(self, env):
@@ -83,7 +93,7 @@ class Args:
         self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.n_actions = env.action_space(agent).n
     def log_params(self, writer=None):
-        hparams = {'envparam/terrrain': TERRAIN,'Adversary tactic':self.ADVERSARY_TACTIC , 'Algorithm': 'DQN' , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '\gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0)))}
+        hparams = {'envparam/terrrain': TERRAIN,'Adversary tactic':self.ADVERSARY_TACTIC , 'Algorithm': 'DQN' , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '/gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0)))}
         metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net}
         if self.TENSORBOARD:
             writer.add_hparams(hparams, metric_dict)
@@ -92,7 +102,9 @@ def mask_array(array, mask):
     int = np.ma.compressed(np.ma.masked_where(mask==0, array) )
 
     return np.ma.compressed(np.ma.masked_where(mask==0, array) )
-
+class Params:
+    def __init__(self, step):
+        self.step = step
 class DQN(nn.Module):
     def __init__(self, env, args, observation_space_shape, action_space_n):
         super().__init__()
@@ -267,7 +279,7 @@ class runner:
 
     def sync_networks(self):
         for agent in self.args.blue_agents:
-                self.target_nets[agent].load_state_dict(self.online_nets[agent].state_dict())
+                self.target_nets[agent].net.load_state_dict(self.online_nets[agent].net.state_dict())
 
     def visualize(self):
           #evaluating the actual policy of the agents
@@ -276,21 +288,31 @@ class runner:
             self.env.render()
 
     def save_model(self, train_step):  #taken from https://github.com/koenboeckx/qmix/blob/main/qmix.py to save learnt model
-        num = str(train_step // self.args.SAVE_CYCLE)
+        
+        params = Params(train_step)
+        params.blue_team_replay_buffer = self.blue_team_buffers.replay_buffer
         if self.args.RUN_NAME != '':
-            dirname = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") +f'step_{train_step}'+ '/agent_dqn_params/'
+            dirname = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") +f'step_{train_step}'
+            dirname_agents = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") +f'step_{train_step}'+ '/agent_dqn_params/'
         else:
-            dirname = self.args.MODEL_DIR + '/' +datetime.now().strftime("%d%H%M%b%Y")+ f'step_{train_step}' + '/agent_dqn_params/'
+            dirname = self.args.MODEL_DIR + '/' +datetime.now().strftime("%d%H%M%b%Y")+ f'step_{train_step}'
+            dirname_agents = self.args.MODEL_DIR + '/' +datetime.now().strftime("%d%H%M%b%Y")+ f'step_{train_step}' + '/agent_dqn_params/'
 
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        if not os.path.exists(dirname_agents):
+            os.makedirs(dirname_agents)
         for agent in self.args.blue_agents:
-                torch.save(self.online_nets[agent].state_dict(),  dirname   + agent + '.pt')
+                torch.save(self.online_nets[agent].net.state_dict(),  dirname_agents   + agent + '.pt')
+        with open(f'{dirname}/loading_parameters.bin',"wb") as f:
+            pickle.dump(params, f)
 
     def load_model(self, dir):
         for agent in self.args.blue_agents:
                 agent_model = dir + '/agent_dqn_params/' + agent +'.pt'
-                self.online_nets[agent].load_state_dict(torch.load(agent_model))
+                self.online_nets[agent].net.load_state_dict(torch.load(agent_model))
+        with open(f'{dir}/loading_parameters.bin',"rb") as f:
+            self.loading_parameters = pickle.load(f)
+        self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
+
 
     def run(self):
         
@@ -432,12 +454,12 @@ class runner:
 
 
 
-            if step % args.SYNC_TARGET_FRAMES == 0:
+            if step % self.args.SYNC_TARGET_FRAMES == 0:
                 self.sync_networks()
 
             #save model
 
-            if step % self.args.SAVE_CYCLE:
+            if step % self.args.SAVE_CYCLE == 0:
                 self.save_model(step)
 
             #logging
@@ -451,17 +473,18 @@ class runner:
     
         ###
 
-    def eval(self, params_directory):
-
+    def eval(self, params_directory, nb_episodes=10000, visualize = True, log = True):
+        results = Metrics(nb_episodes)
         self.env.reset()
         self.reset_buffers()
         self.load_model(params_directory)
         self.transition = dict()
-        for step in itertools.count(start=self.args.ITER_START_STEP):
-            
+        ep_counter = 0
+        for _ in itertools.count(start=self.args.ITER_START_STEP):
+            if ep_counter == nb_episodes:
+                break
             self.step_buffer()
             for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
-                
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
@@ -471,28 +494,31 @@ class runner:
                     action = self.online_nets[agent].act(self.blue_team_buffers.observation[agent])
                 if done:
                     self.env.step(None)
-                    self.env.render()
+                    if visualize:
+                        self.env.render()
                     time.sleep(self.args.WAIT_BETWEEN_STEPS)
                 else:
                     self.env.step(action)
                     
                     time.sleep(self.args.WAIT_BETWEEN_STEPS)
 
-                if action == None:
-                    action = -1
-                done = self.update_buffer(agent, action)
+                self.update_buffer(agent, action)
 
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
         
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
-                self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
+                results.rewards_buffer.append(self.blue_team_buffers.episode_reward)
+                results.nb_steps.append(self.blue_team_buffers.nb_transitions)
+                results.wins.append(self.winner_is_blue())
                 self.env.reset()
-                self.env.render()
-                print(f'Episode reward /agent: {self.blue_team_buffers.episode_reward}')
+                if visualize:
+                    self.env.render()
+                if log:
+                    print(f'Episode reward /agent: {self.blue_team_buffers.episode_reward}')
                 self.reset_buffers()
+                ep_counter += 1
 
-
-
+        return results
 
 if __name__ == "__main__":
     env = defense_v0.env(terrain=TERRAIN, max_cycles=EPISODE_MAX_LENGTH, max_distance=MAX_DISTANCE )
@@ -508,7 +534,6 @@ def main(argv):
     env = defense_v0.env(terrain=TERRAIN, max_cycles=EPISODE_MAX_LENGTH, max_distance=MAX_DISTANCE )
     env.reset()
     args = Args(env)
-    args.log_params(writer)
     runner = runner(env, args)
     try:
         opts, args = getopt.getopt(argv,"hl:e:",["load_model=","eval_model="])
