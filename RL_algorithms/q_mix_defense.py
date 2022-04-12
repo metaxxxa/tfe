@@ -31,7 +31,7 @@ device = torch.device(dev)
 #environment constants
 EPISODE_MAX_LENGTH = 200
 MAX_DISTANCE = 5
-TERRAIN = 'flat_5x5'
+TERRAIN = 'benchmark_10x10_2v2'
 #parameters
 class Args:
     def __init__(self, env):
@@ -59,8 +59,8 @@ class Args:
         self.ITER_START_STEP = 0 #when starting training with an already trained model, 0 by default without model to load
         self.MODEL_TO_LOAD = ''
         self.SAVE_CYCLE = 100000
-        self.MODEL_DIR = 'defense_params'
-        self.RUN_NAME = ''
+        self.MODEL_DIR = 'defense_params_qmix'
+        self.RUN_NAME = 'benchmarking'
         #agent network parameters
         self.COMMON_AGENTS_NETWORK = True
         self.dim_L1_agents_net = 32
@@ -73,7 +73,7 @@ class Args:
         self.LOSING_REWARD = -1
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
-        self.ADVERSARY_TACTIC = 'passive'
+        self.ADVERSARY_TACTIC = 'random'
         self.params(env)
 
     def params(self, env):  #environment specific parameters calculation
@@ -162,6 +162,8 @@ class QMixer(nn.Module):
         return q_values, hidden_state
 
     def get_Q_max(self, masked_q_values, obs, all_q_values=None):
+        if len(masked_q_values) == 0:
+            return -1, torch.tensor([0],device=device)
         max_q_index = torch.argmax(masked_q_values, dim=-1).item()
         max_q = masked_q_values[max_q_index] 
         if all_q_values != None: #only in case a mask is given

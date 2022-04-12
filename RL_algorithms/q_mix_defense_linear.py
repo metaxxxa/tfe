@@ -47,6 +47,7 @@ class Args:
         self.EPSILON_END = 0.02
         self.EPSILON_DECAY = 200000
         self.SYNC_TARGET_FRAMES = 50000
+        self.STOP_TRAINING = self.EPSILON_DECAY*2
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
         self.VISUALIZE_AFTER = 2000000
@@ -59,7 +60,7 @@ class Args:
         self.ITER_START_STEP = 0 #when starting training with an already trained model, 0 by default without model to load
         self.MODEL_TO_LOAD = ''
         self.SAVE_CYCLE = 100000
-        self.MODEL_DIR = 'defense_params'
+        self.MODEL_DIR = 'defense_params_qmixlin'
         self.RUN_NAME = ''
         #agent network parameters
         self.COMMON_AGENTS_NETWORK = True
@@ -162,6 +163,8 @@ class QMixer(nn.Module):
         return q_values
 
     def get_Q_max(self, masked_q_values, obs, all_q_values=None):
+        if len(masked_q_values) == 0:
+            return -1, torch.tensor([0],device=device)
         max_q_index = torch.argmax(masked_q_values, dim=-1).detach().item()
         max_q = masked_q_values[max_q_index] 
         if all_q_values != None: #only in case a mask is given
@@ -478,8 +481,10 @@ class runner_QMix:
         self.env.reset()
         self.reset_buffers()
 
+        transitions_counter = 0
         for step in itertools.count(start=self.args.ITER_START_STEP):
-
+            if transitions_counter == self.args.STOP_TRAINING:
+                break
             if step > self.args.VISUALIZE_AFTER:
                 self.args.VISUALIZE = True
             epsilon = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.EPSILON_START, self.args.EPSILON_END])
@@ -536,6 +541,7 @@ class runner_QMix:
                 print('\n Step', step )
                 print('Avg Episode Reward /agent ', np.mean(self.blue_team_buffers.rew_buffer))
                 print('Avg Loss over a batch', np.mean(self.blue_team_buffers.loss_buffer))
+            transitions_counter += 1
         self.writer.close() 
 
     

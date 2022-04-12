@@ -30,7 +30,7 @@ device = torch.device(dev)
 #environment constants
 EPISODE_MAX_LENGTH = 200
 MAX_DISTANCE = 5
-TERRAIN = 'central_5x5'
+TERRAIN = 'benchmark_10x10_1v1'
 
 #to log results
 class Metrics:
@@ -49,7 +49,7 @@ class Args:
         self.REW_BUFFER_SIZE = 10000
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
-        self.BATCH_SIZE = 32
+        self.BATCH_SIZE = 64
         self.GAMMA = 0.95
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
@@ -68,7 +68,7 @@ class Args:
         #save and reload model
         self.SAVE_CYCLE = 50000
         self.MODEL_DIR = 'defense_params_dqn'
-        self.RUN_NAME = ''
+        self.RUN_NAME = 'benchmarking'
         self.ITER_START_STEP = 0 #when starting training with an already trained model
         self.MODEL_TO_LOAD = ''
         #agent network parameters
@@ -468,10 +468,12 @@ class runner:
                 print('\n Step', step )
                 print('Avg Episode Reward /agent ', np.mean(self.blue_team_buffers.rew_buffer))
                 print('Avg Loss over a batch', np.mean(self.blue_team_buffers.loss_buffer))
+            transitions_counter += 1
+
         if self.args.TENSORBOARD:
             self.writer.close() 
 
-            transitions_counter += 1
+            
         ###
 
     def eval(self, params_directory, nb_episodes=10000, visualize = True, log = True):

@@ -64,5 +64,5 @@ def render_terrain(terrain):
 if __name__ == '__main__':
     terrain = make_terrain(10)
     print(terrain)
-    #write_terrain('central', terrain)
+    write_terrain('','central', terrain)
     print(load_terrain('central_10x10'))
