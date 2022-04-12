@@ -52,9 +52,10 @@ class Args:
         self.BATCH_SIZE = 32
         self.GAMMA = 0.95
         self.EPSILON_START = 1
-        self.EPSILON_END = 0.02
+        self.EPSILON_END = 0.01
         self.EPSILON_DECAY = 200000
         self.SYNC_TARGET_FRAMES = 200
+        self.STOP_TRAINING = self.EPSILON_DECAY*2
         #visualization parameters
         self.PRINT_LOGS = False
         self.VISUALIZE_WHEN_LEARNED = True
@@ -320,7 +321,6 @@ class runner:
         
         if self.args.MODEL_TO_LOAD != '':
             self.load_model(self.args.MODEL_TO_LOAD)
-            print('ok')
         self.env.reset()
 
         for _ in range(self.args.MIN_BUFFER_LENGTH):
@@ -359,9 +359,10 @@ class runner:
 
         self.env.reset()
         self.reset_buffers()
-
+        transitions_counter = 0
         for step in itertools.count():
-
+            if transitions_counter == self.args.STOP_TRAINING:
+                break
             if step > self.args.VISUALIZE_AFTER:
                 self.args.VISUALIZE = True
             epsilon = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.EPSILON_START, self.args.EPSILON_END])
@@ -470,7 +471,7 @@ class runner:
         if self.args.TENSORBOARD:
             self.writer.close() 
 
-    
+            transitions_counter += 1
         ###
 
     def eval(self, params_directory, nb_episodes=10000, visualize = True, log = True):

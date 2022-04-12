@@ -46,6 +46,7 @@ class Args:
         self.EPSILON_END = 0.01
         self.EPSILON_DECAY = 500000
         self.SYNC_TARGET_FRAMES = 200
+        self.STOP_TRAINING = self.EPSILON_DECAY*2
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
         self.VISUALIZE_AFTER = 20000000
@@ -491,9 +492,10 @@ class runner_QMix:
 
         self.env.reset()
         self.reset_buffers()
-
+        transitions_counter = 0
         for step in itertools.count(start=self.args.ITER_START_STEP):
-
+            if transitions_counter == self.args.STOP_TRAINING:
+                break
             if step > self.args.VISUALIZE_AFTER:
                 self.args.VISUALIZE = True
             epsilon = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.EPSILON_START, self.args.EPSILON_END])
@@ -551,6 +553,8 @@ class runner_QMix:
                 print('\n Step', step )
                 print('Avg Episode Reward /agent ', np.mean(self.blue_team_buffers.rew_buffer))
                 print('Avg Loss over a batch', np.mean(self.blue_team_buffers.loss_buffer))
+            
+            transitions_counter += 1
         if self.args.TENSORBOARD:
             self.writer.close() 
 

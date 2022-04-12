@@ -1,5 +1,5 @@
-
-def write_terrain(name, terrain):
+import os
+def write_terrain(dir, name, terrain):
     """Writes representation of terrain to file with
     filename 'name.ter'
 
@@ -9,7 +9,9 @@ def write_terrain(name, terrain):
     """
     size = terrain['size']
     s = render_terrain(terrain)
-    with open(f'env/terrains/{name}_{size}x{size}.ter', 'w') as f:
+    if not os.path.exists(f'env/terrains/{dir}'):
+            os.makedirs(f'env/terrains/{dir}')
+    with open(f'env/terrains/{dir}/{name}_{size}x{size}.ter', 'w') as f:
         f.write(s)
 
 def load_terrain(name):
@@ -40,11 +42,20 @@ def make_terrain(size):
 def render_terrain(terrain):
     size = terrain['size']
     obstacles = terrain['obstacles']
+    blue = []
+    red = []
+    if 'blue' in terrain.keys():
+        blue = terrain['blue']
+        red = terrain['red']
     s = ''
     for x in range(size):
         for y in range(size):
             if (x, y) in obstacles:
                 s += 'x'
+            elif (x, y) in blue:
+                s += '1'
+            elif (x, y) in red:
+                s += '2'
             else:
                 s += '.'
         s += '\n'

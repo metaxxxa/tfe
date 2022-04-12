@@ -516,9 +516,9 @@ class runner_QMix:
                 self.env.reset()
                 self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
                 self.reset_buffers()
-                self.train(step) #training only after each episode
+                #self.train(step) #training only after each episode
             self.blue_team_buffers.replay_buffer.append(self.transition)
-         
+            self.train(step)
             
             #self.scheduler.step(np.mean(self.loss_buffer))
             #update target network
