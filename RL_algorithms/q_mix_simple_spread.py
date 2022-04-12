@@ -232,7 +232,7 @@ class runner_QMix:
             observation_prev[agent], _, _, _ = self.env.last()
             hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
         for _ in range(args.MIN_BUFFER_LENGTH):
-            
+            nb_transitions += 1
             transition = dict()
             for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
                 action = self.env.action_space(agent).sample()
@@ -245,7 +245,7 @@ class runner_QMix:
                     self.visualize()
                 observation[agent], reward, done, info = self.env.last()
                 episode_reward += reward
-                nb_transitions += 1
+                
                 transition[agent] = (observation_prev[agent], action,reward,done,observation[agent],hidden_state_prev[agent], hidden_state[agent])
                 observation_prev[agent] = observation[agent]
                 hidden_state_prev[agent] = hidden_state[agent]
@@ -280,6 +280,7 @@ class runner_QMix:
             epsilon = np.interp(step, [0, args.EPSILON_DECAY], [args.EPSILON_START, args.EPSILON_END])
             rnd_sample = random.random()
             transition = dict()
+            nb_transitions += 1
             for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
 
                 action, hidden_state[agent] = self.online_net.act(agent, observation_prev[agent], hidden_state_prev[agent])
@@ -292,7 +293,7 @@ class runner_QMix:
                     self.env.step(action)
                     self.visualize()
                 observation[agent], reward, done, info = self.env.last()
-                nb_transitions += 1
+                
                 episode_reward += reward
                 transition[agent] = (observation_prev[agent], action,reward,done,observation[agent], hidden_state_prev[agent], hidden_state[agent])
                 observation_prev[agent] = observation[agent]
@@ -308,7 +309,7 @@ class runner_QMix:
                 nb_transitions = 0
                 one_agent_done = 0
                 for agent in self.env.agents:
-                    observation_prev[agent], _, _, _ = self.env.last()
+                    observation_prev[agent] = self.env.observe(agent)
                     hidden_state_prev[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
             
             self.replay_buffer.append(transition)
@@ -384,6 +385,7 @@ class runner_QMix:
                 print('Avg Loss over a batch', np.mean(self.loss_buffer))
         writer.close() 
 
+
     def eval(self, params_directory):
 
         self.load_model(params_directory)
@@ -431,7 +433,7 @@ class runner_QMix:
 
         ###
 if __name__ == "__main__":
-    env = simple_spread_v2.env(N=1, local_ratio=0.5, max_cycles=25, continuous_actions=False)
+    env = simple_spread_v2.env(N=2, local_ratio=0.5, max_cycles=25, continuous_actions=False)
     env.reset()
     args = Args(env)
     args.log_params(writer)
