@@ -13,16 +13,19 @@ import time
 import re
 import getopt
 import pickle
+
 #importing the defense environment
-os.chdir('/home/jack/Documents/ERM/Master thesis/tfe')
-sys.path.insert(0, '/home/jack/Documents/ERM/Master thesis/tfe')
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+os.chdir(BASE_DIR)
+sys.path.insert(0, BASE_DIR)
 from env import defense_v0
 
 if torch.cuda.is_available():  
   dev = "cuda:0" 
 else:  
   dev = "cpu"  
-dev = "cpu"  #if cpu faster than gpu 
+  
 device = torch.device(dev) 
 
 
