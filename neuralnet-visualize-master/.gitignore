@@ -1,0 +1,7 @@
+dev/
+dist/
+stats/
+/build/
+*.egg-info/
+*.txt
+!requirements.txt

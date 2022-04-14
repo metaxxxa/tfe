@@ -1,0 +1,221 @@
+graph {
+	graph [color=white label="DQN Neural Network" labelloc=t rankdir=LR ranksep=2 splines=line]
+	node [label="" nodesep=4 shape=circle width=0.5]
+	subgraph cluster_Dense_input {
+		graph [label=""]
+		label="+22" labeljust=right labelloc=bottom
+		Dense_input_0 [fillcolor=yellow shape=point style=filled]
+		Dense_input_1 [fillcolor=yellow shape=point style=filled]
+		Dense_input_2 [fillcolor=yellow shape=point style=filled]
+		Dense_input_3 [fillcolor=yellow shape=point style=filled]
+		Dense_input_4 [fillcolor=yellow shape=point style=filled]
+		Dense_input_5 [fillcolor=yellow shape=point style=filled]
+		Dense_input_6 [fillcolor=yellow shape=point style=filled]
+		Dense_input_7 [fillcolor=yellow shape=point style=filled]
+		Dense_input_8 [fillcolor=yellow shape=point style=filled]
+		Dense_input_9 [fillcolor=yellow shape=point style=filled]
+	}
+	subgraph cluster_Dense_hidden1 {
+		graph [label=""]
+		label="+54" labeljust=right labelloc=bottom
+		Dense_hidden1_0 [fillcolor=green shape=point style=filled]
+		Dense_hidden1_1 [fillcolor=green shape=point style=filled]
+		Dense_hidden1_2 [fillcolor=green shape=point style=filled]
+		Dense_hidden1_3 [fillcolor=green shape=point style=filled]
+		Dense_hidden1_4 [fillcolor=green shape=point style=filled]
+		Dense_hidden1_5 [fillcolor=green shape=point style=filled]
+		Dense_hidden1_6 [fillcolor=green shape=point style=filled]
+		Dense_hidden1_7 [fillcolor=green shape=point style=filled]
+		Dense_hidden1_8 [fillcolor=green shape=point style=filled]
+		Dense_hidden1_9 [fillcolor=green shape=point style=filled]
+	}
+	subgraph cluster_Dense_hidden2 {
+		graph [label=""]
+		Dense_hidden2_0 [fillcolor=green shape=point style=filled]
+		Dense_hidden2_1 [fillcolor=green shape=point style=filled]
+		Dense_hidden2_2 [fillcolor=green shape=point style=filled]
+		Dense_hidden2_3 [fillcolor=green shape=point style=filled]
+		Dense_hidden2_4 [fillcolor=green shape=point style=filled]
+		Dense_hidden2_5 [fillcolor=green shape=point style=filled]
+		Dense_hidden2_6 [fillcolor=green shape=point style=filled]
+	}
+	Dense_input_0 -- Dense_hidden1_0
+	Dense_input_0 -- Dense_hidden1_1
+	Dense_input_0 -- Dense_hidden1_2
+	Dense_input_0 -- Dense_hidden1_3
+	Dense_input_0 -- Dense_hidden1_4
+	Dense_input_0 -- Dense_hidden1_5
+	Dense_input_0 -- Dense_hidden1_6
+	Dense_input_0 -- Dense_hidden1_7
+	Dense_input_0 -- Dense_hidden1_8
+	Dense_input_0 -- Dense_hidden1_9
+	Dense_input_1 -- Dense_hidden1_0
+	Dense_input_1 -- Dense_hidden1_1
+	Dense_input_1 -- Dense_hidden1_2
+	Dense_input_1 -- Dense_hidden1_3
+	Dense_input_1 -- Dense_hidden1_4
+	Dense_input_1 -- Dense_hidden1_5
+	Dense_input_1 -- Dense_hidden1_6
+	Dense_input_1 -- Dense_hidden1_7
+	Dense_input_1 -- Dense_hidden1_8
+	Dense_input_1 -- Dense_hidden1_9
+	Dense_input_2 -- Dense_hidden1_0
+	Dense_input_2 -- Dense_hidden1_1
+	Dense_input_2 -- Dense_hidden1_2
+	Dense_input_2 -- Dense_hidden1_3
+	Dense_input_2 -- Dense_hidden1_4
+	Dense_input_2 -- Dense_hidden1_5
+	Dense_input_2 -- Dense_hidden1_6
+	Dense_input_2 -- Dense_hidden1_7
+	Dense_input_2 -- Dense_hidden1_8
+	Dense_input_2 -- Dense_hidden1_9
+	Dense_input_3 -- Dense_hidden1_0
+	Dense_input_3 -- Dense_hidden1_1
+	Dense_input_3 -- Dense_hidden1_2
+	Dense_input_3 -- Dense_hidden1_3
+	Dense_input_3 -- Dense_hidden1_4
+	Dense_input_3 -- Dense_hidden1_5
+	Dense_input_3 -- Dense_hidden1_6
+	Dense_input_3 -- Dense_hidden1_7
+	Dense_input_3 -- Dense_hidden1_8
+	Dense_input_3 -- Dense_hidden1_9
+	Dense_input_4 -- Dense_hidden1_0
+	Dense_input_4 -- Dense_hidden1_1
+	Dense_input_4 -- Dense_hidden1_2
+	Dense_input_4 -- Dense_hidden1_3
+	Dense_input_4 -- Dense_hidden1_4
+	Dense_input_4 -- Dense_hidden1_5
+	Dense_input_4 -- Dense_hidden1_6
+	Dense_input_4 -- Dense_hidden1_7
+	Dense_input_4 -- Dense_hidden1_8
+	Dense_input_4 -- Dense_hidden1_9
+	Dense_input_5 -- Dense_hidden1_0
+	Dense_input_5 -- Dense_hidden1_1
+	Dense_input_5 -- Dense_hidden1_2
+	Dense_input_5 -- Dense_hidden1_3
+	Dense_input_5 -- Dense_hidden1_4
+	Dense_input_5 -- Dense_hidden1_5
+	Dense_input_5 -- Dense_hidden1_6
+	Dense_input_5 -- Dense_hidden1_7
+	Dense_input_5 -- Dense_hidden1_8
+	Dense_input_5 -- Dense_hidden1_9
+	Dense_input_6 -- Dense_hidden1_0
+	Dense_input_6 -- Dense_hidden1_1
+	Dense_input_6 -- Dense_hidden1_2
+	Dense_input_6 -- Dense_hidden1_3
+	Dense_input_6 -- Dense_hidden1_4
+	Dense_input_6 -- Dense_hidden1_5
+	Dense_input_6 -- Dense_hidden1_6
+	Dense_input_6 -- Dense_hidden1_7
+	Dense_input_6 -- Dense_hidden1_8
+	Dense_input_6 -- Dense_hidden1_9
+	Dense_input_7 -- Dense_hidden1_0
+	Dense_input_7 -- Dense_hidden1_1
+	Dense_input_7 -- Dense_hidden1_2
+	Dense_input_7 -- Dense_hidden1_3
+	Dense_input_7 -- Dense_hidden1_4
+	Dense_input_7 -- Dense_hidden1_5
+	Dense_input_7 -- Dense_hidden1_6
+	Dense_input_7 -- Dense_hidden1_7
+	Dense_input_7 -- Dense_hidden1_8
+	Dense_input_7 -- Dense_hidden1_9
+	Dense_input_8 -- Dense_hidden1_0
+	Dense_input_8 -- Dense_hidden1_1
+	Dense_input_8 -- Dense_hidden1_2
+	Dense_input_8 -- Dense_hidden1_3
+	Dense_input_8 -- Dense_hidden1_4
+	Dense_input_8 -- Dense_hidden1_5
+	Dense_input_8 -- Dense_hidden1_6
+	Dense_input_8 -- Dense_hidden1_7
+	Dense_input_8 -- Dense_hidden1_8
+	Dense_input_8 -- Dense_hidden1_9
+	Dense_input_9 -- Dense_hidden1_0
+	Dense_input_9 -- Dense_hidden1_1
+	Dense_input_9 -- Dense_hidden1_2
+	Dense_input_9 -- Dense_hidden1_3
+	Dense_input_9 -- Dense_hidden1_4
+	Dense_input_9 -- Dense_hidden1_5
+	Dense_input_9 -- Dense_hidden1_6
+	Dense_input_9 -- Dense_hidden1_7
+	Dense_input_9 -- Dense_hidden1_8
+	Dense_input_9 -- Dense_hidden1_9
+	Dense_hidden1_0 -- Dense_hidden2_0
+	Dense_hidden1_0 -- Dense_hidden2_1
+	Dense_hidden1_0 -- Dense_hidden2_2
+	Dense_hidden1_0 -- Dense_hidden2_3
+	Dense_hidden1_0 -- Dense_hidden2_4
+	Dense_hidden1_0 -- Dense_hidden2_5
+	Dense_hidden1_0 -- Dense_hidden2_6
+	Dense_hidden1_1 -- Dense_hidden2_0
+	Dense_hidden1_1 -- Dense_hidden2_1
+	Dense_hidden1_1 -- Dense_hidden2_2
+	Dense_hidden1_1 -- Dense_hidden2_3
+	Dense_hidden1_1 -- Dense_hidden2_4
+	Dense_hidden1_1 -- Dense_hidden2_5
+	Dense_hidden1_1 -- Dense_hidden2_6
+	Dense_hidden1_2 -- Dense_hidden2_0
+	Dense_hidden1_2 -- Dense_hidden2_1
+	Dense_hidden1_2 -- Dense_hidden2_2
+	Dense_hidden1_2 -- Dense_hidden2_3
+	Dense_hidden1_2 -- Dense_hidden2_4
+	Dense_hidden1_2 -- Dense_hidden2_5
+	Dense_hidden1_2 -- Dense_hidden2_6
+	Dense_hidden1_3 -- Dense_hidden2_0
+	Dense_hidden1_3 -- Dense_hidden2_1
+	Dense_hidden1_3 -- Dense_hidden2_2
+	Dense_hidden1_3 -- Dense_hidden2_3
+	Dense_hidden1_3 -- Dense_hidden2_4
+	Dense_hidden1_3 -- Dense_hidden2_5
+	Dense_hidden1_3 -- Dense_hidden2_6
+	Dense_hidden1_4 -- Dense_hidden2_0
+	Dense_hidden1_4 -- Dense_hidden2_1
+	Dense_hidden1_4 -- Dense_hidden2_2
+	Dense_hidden1_4 -- Dense_hidden2_3
+	Dense_hidden1_4 -- Dense_hidden2_4
+	Dense_hidden1_4 -- Dense_hidden2_5
+	Dense_hidden1_4 -- Dense_hidden2_6
+	Dense_hidden1_5 -- Dense_hidden2_0
+	Dense_hidden1_5 -- Dense_hidden2_1
+	Dense_hidden1_5 -- Dense_hidden2_2
+	Dense_hidden1_5 -- Dense_hidden2_3
+	Dense_hidden1_5 -- Dense_hidden2_4
+	Dense_hidden1_5 -- Dense_hidden2_5
+	Dense_hidden1_5 -- Dense_hidden2_6
+	Dense_hidden1_6 -- Dense_hidden2_0
+	Dense_hidden1_6 -- Dense_hidden2_1
+	Dense_hidden1_6 -- Dense_hidden2_2
+	Dense_hidden1_6 -- Dense_hidden2_3
+	Dense_hidden1_6 -- Dense_hidden2_4
+	Dense_hidden1_6 -- Dense_hidden2_5
+	Dense_hidden1_6 -- Dense_hidden2_6
+	Dense_hidden1_7 -- Dense_hidden2_0
+	Dense_hidden1_7 -- Dense_hidden2_1
+	Dense_hidden1_7 -- Dense_hidden2_2
+	Dense_hidden1_7 -- Dense_hidden2_3
+	Dense_hidden1_7 -- Dense_hidden2_4
+	Dense_hidden1_7 -- Dense_hidden2_5
+	Dense_hidden1_7 -- Dense_hidden2_6
+	Dense_hidden1_8 -- Dense_hidden2_0
+	Dense_hidden1_8 -- Dense_hidden2_1
+	Dense_hidden1_8 -- Dense_hidden2_2
+	Dense_hidden1_8 -- Dense_hidden2_3
+	Dense_hidden1_8 -- Dense_hidden2_4
+	Dense_hidden1_8 -- Dense_hidden2_5
+	Dense_hidden1_8 -- Dense_hidden2_6
+	Dense_hidden1_9 -- Dense_hidden2_0
+	Dense_hidden1_9 -- Dense_hidden2_1
+	Dense_hidden1_9 -- Dense_hidden2_2
+	Dense_hidden1_9 -- Dense_hidden2_3
+	Dense_hidden1_9 -- Dense_hidden2_4
+	Dense_hidden1_9 -- Dense_hidden2_5
+	Dense_hidden1_9 -- Dense_hidden2_6
+	subgraph cluster_Dense_hidden2 {
+		Dense_hidden2_0 [fillcolor=red style=filled]
+		Dense_hidden2_1 [fillcolor=red style=filled]
+		Dense_hidden2_2 [fillcolor=red style=filled]
+		Dense_hidden2_3 [fillcolor=red style=filled]
+		Dense_hidden2_4 [fillcolor=red style=filled]
+		Dense_hidden2_5 [fillcolor=red style=filled]
+		Dense_hidden2_6 [fillcolor=red style=filled]
+	}
+}
