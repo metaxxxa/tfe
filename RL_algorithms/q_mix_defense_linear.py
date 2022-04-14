@@ -17,87 +17,24 @@ import pickle
 import cProfile 
 
 #importing the defense environment
-os.chdir('/home/jack/Documents/ERM/Master thesis/tfe')
-sys.path.insert(0, '/home/jack/Documents/ERM/Master thesis/tfe')
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(BASE_DIR)
+sys.path.insert(0, BASE_DIR)
 from env import defense_v0
 
-if torch.cuda.is_available():  
-  dev = "cuda:0" 
-else:  
-  dev = "cpu"  
-dev = "cpu"
-device = torch.device(dev) 
 
+    
+from Utils.helper import Buffers, Params, Metrics, Constants, mask_array, get_device
+from Utils.params import QMIXArgs as Args
 
+device = get_device()
 #environment constants
-EPISODE_MAX_LENGTH = 200
-MAX_DISTANCE = 5
+constants = Constants()
 TERRAIN = 'flat_5x5'
-#parameters
-class Args:
-    def __init__(self, env):
-            
-        self.BUFFER_SIZE = 20000
-        self.REW_BUFFER_SIZE = 1000
-        self.LEARNING_RATE = 5e-4
-        self.MIN_BUFFER_LENGTH = 3000
-        self.BATCH_SIZE = 1000
-        self.GAMMA = 0.99
-        self.EPSILON_START = 1
-        self.EPSILON_END = 0.02
-        self.EPSILON_DECAY = 200000
-        self.SYNC_TARGET_FRAMES = 50000
-        self.STOP_TRAINING = self.EPSILON_DECAY*2
-        #visualization parameters
-        self.VISUALIZE_WHEN_LEARNED = True
-        self.VISUALIZE_AFTER = 2000000
-        self.VISUALIZE = False
-        self.WAIT_BETWEEN_STEPS = 0.0001
-        self.GREEDY = True
-        #logging
-        self.TENSORBOARD = True
-        #saving models
-        self.ITER_START_STEP = 0 #when starting training with an already trained model, 0 by default without model to load
-        self.MODEL_TO_LOAD = ''
-        self.SAVE_CYCLE = 100000
-        self.MODEL_DIR = 'defense_params_qmixlin'
-        self.RUN_NAME = ''
-        #agent network parameters
-        self.COMMON_AGENTS_NETWORK = True
-        self.dim_L1_agents_net = 32
-        self.dim_L2_agents_net = 32
-        #mixing network parameters
-        self.mixer_hidden_dim = 32
-        self.mixer_hidden_dim2 = 32
-        #environment specific parameters calculation
-        self.WINNING_REWARD = 1
-        self.LOSING_REWARD = -1
-        self.TEAM_TO_TRAIN = 'blue'
-        self.OPPOSING_TEAM = 'red'
-        self.ADVERSARY_TACTIC = 'passive'
-        self.params(env)
+MODEL_DIR = 'defense_params_qmixlin'
+RUN_NAME = ''
+ADVERSARY_TACTIC = 'random'
 
-    def params(self, env):  #environment specific parameters calculation
-        
-        self.blue_agents = [key for key in env.agents if re.match(rf'^{self.TEAM_TO_TRAIN}',key)]
-        self.all_agents = env.agents
-        self.opposing_agents = [key for key in env.agents if re.match(rf'^{self.OPPOSING_TEAM}',key)]
-        self.n_blue_agents = len(self.blue_agents)
-        agent = self.blue_agents[0]
-        self.nb_inputs_agent = np.prod(env.observation_space(agent).spaces['obs'].shape)
-        self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
-        self.n_actions = env.action_space(agent).n
-    def log_params(self, writer):
-        hparams = {'envparam/terrrain': TERRAIN, 'Adversary tactic' : self.ADVERSARY_TACTIC, 'Algorithm': 'QMIX_linear' , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '/gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0))), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
-        metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net, 'hparam/mixer hidden dim 1': self.mixer_hidden_dim, 'hparam/mixer hidden dim 2': self.mixer_hidden_dim2}
-        writer.add_hparams(hparams, metric_dict)
-
-class Params:
-    def __init__(self, step):
-        self.step = step
-
-def mask_array(array, mask):
-    return np.ma.compressed(np.ma.masked_where(mask==0, array) )
 
 class QMixer(nn.Module):
     def __init__(self, env, args):
@@ -198,34 +135,21 @@ class AgentNet(nn.Module):
     def forward(self,obs_t):
         return self.net(obs_t)
 
-class buffers:
-    def __init__(self, env, args, agents):
-        
-        self.observation = dict()
-        self.observation_next = dict()
-        self.episode_reward = 0.0
-        self.nb_transitions = 0
-        self.replay_buffer = deque(maxlen=args.BUFFER_SIZE)
-        self.rew_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
-        self.loss_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
+ 
 
-        for agent in agents:
-            self.observation[agent] = env.observe(agent)
-        
-
-class runner_QMix:
+class Runner:
     def __init__(self, env, args):
         self.args = args
         self.env = env
-        self.blue_team_buffers = buffers(self.env, self.args, self.args.blue_agents)
-        self.opposing_team_buffers = buffers(self.env, self.args, self.args.opposing_agents)
+        self.blue_team_buffers = Buffers(self.env, self.args, self.args.blue_agents, device)
+        self.opposing_team_buffers = Buffers(self.env, self.args, self.args.opposing_agents, device)
         self.online_net = QMixer(self.env, self.args)
         self.target_net = copy.deepcopy(self.online_net) #QMixer(self.env, self.args)
 
 
         #display model graphs in tensorboard
         self.writer = SummaryWriter()
-        args.log_params(self.writer)
+        args.log_params(self.writer, 'qmixlin', TERRAIN)
         self.writer.add_graph(self.online_net.get_agent_nets(self.args.blue_agents[0]),(torch.empty((self.args.observations_dim),device=device)) )
         self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
 , torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
@@ -483,7 +407,7 @@ class runner_QMix:
 
         transitions_counter = 0
         for step in itertools.count(start=self.args.ITER_START_STEP):
-            if transitions_counter == self.args.STOP_TRAINING:
+            if transitions_counter > self.args.STOP_TRAINING:
                 break
             if step > self.args.VISUALIZE_AFTER:
                 self.args.VISUALIZE = True
@@ -587,10 +511,13 @@ class runner_QMix:
 
 
 def main(argv):
-    env = defense_v0.env(terrain=TERRAIN, max_cycles=EPISODE_MAX_LENGTH, max_distance=MAX_DISTANCE )
+    env = defense_v0.env(terrain=TERRAIN, max_cycles=constants.EPISODE_MAX_LENGTH, max_distance=constants.MAX_DISTANCE )
     env.reset()
     args = Args(env)
-    runner = runner_QMix(env, args)
+    args.MODEL_DIR = MODEL_DIR
+    args.RUN_NAME = RUN_NAME
+    args.ADVERSARY_TACTIC = ADVERSARY_TACTIC
+    runner = Runner(env, args)
     try:
         opts, args = getopt.getopt(argv,"hl:e:",["load_model=","eval_model="])
     except getopt.GetoptError:
