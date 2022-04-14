@@ -35,7 +35,7 @@ class Results:
         self.EPISODE_MAX_LENGTH = EPISODE_MAX_LENGTH
         self.MAX_DISTANCE = MAX_DISTANCE
 
-def test_model(algorithm, model_directory, environments_directory, nb_episodes, EPISODE_MAX_LENGTH, MAX_DISTANCE, save_directory = None): #test all environments of a directory with a given model
+def test_model(algorithm, adversary_tactic, model_directory, environments_directory, nb_episodes, EPISODE_MAX_LENGTH, MAX_DISTANCE, save_directory = None): #test all environments of a directory with a given model
 
     results ={'algorithm': algorithm, 'model': model_directory, 'environments': environments_directory, 'nb episodes': nb_episodes, 'episode max length': EPISODE_MAX_LENGTH, 'max distance':  MAX_DISTANCE, 'envs': {}}
 
@@ -48,7 +48,9 @@ def test_model(algorithm, model_directory, environments_directory, nb_episodes, 
 
         if algorithm == 'dqn':
             args = dqn.Args(env)
-            runner = dqn.runner(env, args)
+            args.ADVERSARY_TACTIC = adversary_tactic
+            args.TENSORBOARD = False
+            runner = dqn.Runner(env, args)
 
         res = runner.eval(model_directory, nb_episodes, False, False)
         res.env = f'{filename[0:-4]}'
@@ -69,14 +71,13 @@ algo = 'dqn'
 model_dir = 'defense_params_dqn/111943avril2022step_0'
 env_dir = 'testt'
 nb_ep = 10
-
-out = test_model(algo, model_dir, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'evals')
+adversary_type = 'random'
+model_dir = 'random'
+out = test_model(algo, adversary_type,  model_dir, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'evals')
 
 
 # plot results
 
-
+env = defense_v0.env(terrain='benchmark_10x10_2v2', max_cycles=20, max_distance=5 )
+env.render()
 print('ok')
-result_file = 'evals/results_dqn_testt_111943avril2022step_0.bin'
-with open(result_file,"rb") as f:
-    results = pickle.load(f)
