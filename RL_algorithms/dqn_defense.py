@@ -128,7 +128,8 @@ class Runner:
         else:
             self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
             self.blue_team_buffers.episode_reward += reward
-            
+            if action == 5:
+                print('fire')
             self.transition[agent] = [self.blue_team_buffers.observation[agent], action,reward,done,self.blue_team_buffers.observation_next[agent]]
             self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
             
@@ -249,15 +250,13 @@ class Runner:
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
-                    if done:
-                        action = None
                     
                 else:
                     self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.random_action(agent, self.blue_team_buffers.observation[agent])
-                    if done:
-                        action = None
                     
+                if done:
+                    action = None   
                 self.env.step(action)
                 self.visualize()
                 self.update_buffer(agent, action)
@@ -292,16 +291,14 @@ class Runner:
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
-                    if done:
-                        action = None
                     
                 else:
                     self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.online_nets[agent].act(self.blue_team_buffers.observation[agent])
                     if rnd_sample <= epsilon and self.args.GREEDY:
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
-                    if done:
-                        action = None
+                if done:
+                    action = None
                     
                 self.env.step(action)
                 self.visualize()
@@ -323,7 +320,7 @@ class Runner:
 
             transitions = random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
             loss_sum = 0
-            for agent in self.args.blue_agents:
+            for agent in self.args.blue_agents: #in case we use IDQN
         
                 
                 obses = np.asarray([t[agent][0]['obs'] for t in transitions])
@@ -335,8 +332,8 @@ class Runner:
 
                 obses_t = torch.as_tensor(obses, dtype=torch.float32,device=device)
                 actions_t = torch.as_tensor(actions, dtype=torch.int64,device=device).unsqueeze(-1)
-                rews_t = torch.as_tensor(rews, dtype=torch.float32,device=device).unsqueeze(-1)
-                dones_t = torch.as_tensor(dones, dtype=torch.float32,device=device).unsqueeze(-1)
+                rews_t = torch.as_tensor(rews, dtype=torch.float32,device=device)
+                dones_t = torch.as_tensor(dones, dtype=torch.float32,device=device)
                 #new_obses_t = torch.as_tensor(new_obses, dtype=torch.float32)
                 max_target_q_values_t = torch.as_tensor(max_target_q_values, dtype=torch.float32,device=device)
                 # targets
@@ -352,7 +349,7 @@ class Runner:
                 
                 q_values = self.online_nets[agent](obses_t)
             
-                action_q_values = torch.gather(input=q_values, dim=1, index=actions_t)
+                action_q_values = torch.gather(input=q_values, dim=1, index=actions_t).squeeze(-1)
 
                 error = targets - action_q_values
                 loss = error**2
