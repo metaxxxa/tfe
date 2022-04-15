@@ -128,8 +128,6 @@ class Runner:
         else:
             self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
             self.blue_team_buffers.episode_reward += reward
-            if action == 5:
-                print('fire')
             self.transition[agent] = [self.blue_team_buffers.observation[agent], action,reward,done,self.blue_team_buffers.observation_next[agent]]
             self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
             
