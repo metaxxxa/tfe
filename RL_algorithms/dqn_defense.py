@@ -86,7 +86,7 @@ class Runner:
         self.args = args
         self.env = env
         self.blue_team_buffers = Buffers(self.env, self.args, self.args.blue_agents, device)
-        self.opposing_team_buffers = Buffers(self.env, self.args, self.args.opposing_agents, device)
+        self.opposing_team_buffers = Buffers(self.env, self.args, self.args.red_agents, device)
         self.online_nets = {}
         self.target_nets = {}
         self.online_nets_params = list()
@@ -106,6 +106,15 @@ class Runner:
         
         self.sync_networks()
         
+        if self.args.MODEL_TO_LOAD != '':
+            self.load_model(self.args.MODEL_TO_LOAD)
+
+        if self.args.ADVERSARY_TACTIC == 'dqn':
+            self.adversary_nets = {}
+            for agent in self.args.red_agents:
+                self.adversary_nets[agent] = DQN(self.env, self.args, self.env.observation_space(agent).spaces['obs'].shape, self.env.action_space(agent).n)
+            self.load_model(self.args.ADVERSARY_MODEL, True)
+
         #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
     def random_action(self, agent, obs):
         if all(element == 0 for element in obs['action_mask']):
@@ -143,7 +152,6 @@ class Runner:
         return done
     def step_buffer(self):
         self.blue_team_buffers.nb_transitions += 1
-        self.opposing_team_buffers.nb_transitions +=1
     def reset_buffer(self, agent):
         if self.is_opposing_team(agent):
             self.opposing_team_buffers.observation[agent] = self.env.observe(agent)
@@ -202,10 +210,13 @@ class Runner:
             return self.random_action(agent, obs)
         if self.args.ADVERSARY_TACTIC == 'passive':
             return 0 #return first available action : do nothijng
+        if self.args.ADVERSARY_TACTIC == 'dqn':
+            return self.adversary_nets[agent].act(obs)
 
     def sync_networks(self):
         for agent in self.args.blue_agents:
                 self.target_nets[agent].net.load_state_dict(self.online_nets[agent].net.state_dict())
+        
 
     def visualize(self):
           #evaluating the actual policy of the agents
@@ -231,21 +242,27 @@ class Runner:
         with open(f'{dirname}/loading_parameters.bin',"wb") as f:
             pickle.dump(params, f)
 
-    def load_model(self, dir):
-        for agent in self.args.blue_agents:
-                agent_model = dir + '/agent_dqn_params/' + agent +'.pt'
-                self.online_nets[agent].net.load_state_dict(torch.load(agent_model))
-        with open(f'{dir}/loading_parameters.bin',"rb") as f:
-            self.loading_parameters = pickle.load(f)
-        self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
-
+    def load_model(self, dir, red = False):
+        if red:
+            for index in range(len(self.args.blue_agents)):
+                agent_model = dir + '/agent_dqn_params/' + self.args.blue_agents[index] +'.pt'
+                self.adversary_nets[self.args.red_agents[index]].net.load_state_dict(torch.load(agent_model))
+            with open(f'{dir}/loading_parameters.bin',"rb") as f:
+                self.loading_parameters = pickle.load(f)
+            self.opposing_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
+        else:            
+            for agent in self.args.blue_agents:
+                    agent_model = dir + '/agent_dqn_params/' + agent +'.pt'
+                    self.online_nets[agent].net.load_state_dict(torch.load(agent_model))
+            with open(f'{dir}/loading_parameters.bin',"rb") as f:
+                self.loading_parameters = pickle.load(f)
+            self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
 
     def run(self):
         
         #Init replay buffer
         
-        if self.args.MODEL_TO_LOAD != '':
-            self.load_model(self.args.MODEL_TO_LOAD)
+        
         self.env.reset()
 
         for _ in range(self.args.MIN_BUFFER_LENGTH):
@@ -277,6 +294,9 @@ class Runner:
                 #self.give_global_reward()
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents) #
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
+                self.blue_team_buffers.steps_buffer.append(self.blue_team_buffers.episode_reward)
+                self.blue_team_buffers.wins_buffer.append(self.blue_team_buffers.episode_reward)
+                
                 self.env.reset()
                 
                 self.reset_buffers()
@@ -321,9 +341,13 @@ class Runner:
                 #self.give_global_reward()
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
-                self.env.reset()
+                
                 if self.args.TENSORBOARD:
                     self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
+                    self.writer.add_scalar("Steps", self.blue_team_buffers.nb_transitions,step  )
+                    self.writer.add_scalar("Win", int(self.winner_is_blue()),step  )
+                
+                self.env.reset()
                 self.reset_buffers()
 
             self.blue_team_buffers.replay_buffer.append(self.transition)
@@ -493,16 +517,17 @@ class Runner:
 def main(argv):
     env = defense_v0.env(terrain=TERRAIN, max_cycles=constants.EPISODE_MAX_LENGTH, max_distance=constants.MAX_DISTANCE )
     env.reset()
-    args = Args(env)
-    args.MODEL_DIR = MODEL_DIR
-    args.RUN_NAME = RUN_NAME
-    args.ADVERSARY_TACTIC = ADVERSARY_TACTIC
-    runner = Runner(env, args)
+    args_runner = Args(env)
+    args_runner.MODEL_DIR = MODEL_DIR
+    args_runner.RUN_NAME = RUN_NAME
+    args_runner.ADVERSARY_TACTIC = ADVERSARY_TACTIC
+    
     try:
-        opts, args = getopt.getopt(argv,"hl:e:",["load_model=","eval_model="])
+        opts, args = getopt.getopt(argv,"ha:l:e:",["load_adversary","load_model=","eval_model="])
     except getopt.GetoptError:
         print('error')
     if len(argv) == 0:
+        runner = Runner(env, args)
         runner.run()
     for opt, arg in opts:
         if opt == '-h':
@@ -512,10 +537,15 @@ def main(argv):
             print('OR')
             print('dqn.py  -e <model_folder_to_eval> <folder_to_save_metrics>')
             sys.exit()
+        elif opt in ('-a', "--load_adversary"):
+            args_runner.ADVERSARY_MODEL = arg
+            args_runner.ADVERSARY_TACTIC = 'dqn'
         elif opt in ("-l", "--load_model"):
-            runner.args.MODEL_TO_LOAD = arg
+            args_runner.MODEL_TO_LOAD = arg
+            runner = Runner(env, args_runner)
             runner.run()
         elif opt in ("-e", "--eval_model"):
+            runner = Runner(env, args_runner)
             runner.eval(arg)
 
 

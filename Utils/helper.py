@@ -32,6 +32,8 @@ class Buffers:
         self.replay_buffer = deque(maxlen=args.BUFFER_SIZE)
         self.rew_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
         self.loss_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
+        self.steps_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
+        self.wins_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
 
         for agent in agents:
             self.observation[agent] = env.observe(agent)

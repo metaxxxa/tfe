@@ -1,6 +1,7 @@
 
 from ast import Param
 from datetime import datetime
+from doctest import DocTestFinder
 import torch
 import torch.nn as nn
 import numpy as np
@@ -50,7 +51,7 @@ class QMixer(nn.Module):
                 total_state_dim += np.prod(env.observation_space(agent).spaces['obs'].shape)               
 
         else:
-            for agent in env.agents:
+            for agent in args.blue_agents:
                 self.agents_nets = dict()
                 self.agents_nets[agent] = AgentRNN(args)
                 total_state_dim += np.prod(env.observation_space(agent).shape)
@@ -143,8 +144,7 @@ class Runner:
         self.blue_team_buffers = Buffers(self.env, self.args, self.args.blue_agents, device)
         self.opposing_team_buffers = Buffers(self.env, self.args, self.args.opposing_agents, device)
         self.online_net = QMixer(self.env, self.args)
-        self.target_net = copy.deepcopy(self.online_net) #QMixer(self.env, self.args)
-
+        self.target_net = copy.deepcopy(self.online_net) 
 
         #display model graphs in tensorboard
         if self.args.TENSORBOARD:
@@ -161,6 +161,11 @@ class Runner:
 , torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
         self.sync_networks()
         self.optimizer = torch.optim.Adam(self.online_net.net_params, lr = self.args.LEARNING_RATE)
+        
+        if self.args.ADVERSARY_TACTIC == 'qmix':
+            self.adversary_net =QMixer(self.env, self.args)
+            self.load_model(self.args.ADVERSARY_MODEL, True)
+
         #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
     def random_action(self, agent, obs):
         if all(element == 0 for element in obs['action_mask']):
@@ -202,7 +207,7 @@ class Runner:
     def reset_buffer(self, agent):
         if self.is_opposing_team(agent):
             self.opposing_team_buffers.observation[agent] = self.env.observe(agent)
-            #self.opposing_team_buffers.hidden_state_next[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
+            self.opposing_team_buffers.hidden_state_next[agent] = torch.zeros(self.args.dim_L2_agents_net, device=device).unsqueeze(0)
 
         else:
             self.blue_team_buffers.observation[agent] = self.env.observe(agent)
@@ -260,6 +265,9 @@ class Runner:
             return self.random_action(agent, obs)
         elif   self.args.ADVERSARY_TACTIC == 'passive':
             return 0
+        elif self.args.ADVERSARY_TACTIC == 'qmix':
+            action, self.opposing_team_buffers.hidden_state[agent] = self.adversary_net.act(agent, obs, self.opposing_team_buffers.hidden_state[agent])
+            return action
 
     def sync_networks(self):
         self.target_net.load_state_dict(self.online_net.state_dict())
@@ -296,21 +304,37 @@ class Runner:
         with open(f'{dirname}/loading_parameters.bin',"wb") as f:
             pickle.dump(params, f)
 
-    def load_model(self, dir):
+    def load_model(self, dir, red=False):
+
         mixer_model = dir + '/qmix_net_params.pt'
         target_model = dir + '/qmix_target_net_params.pt'
-        self.online_net.load_state_dict(torch.load(mixer_model))
-        self.target_net.load_state_dict(torch.load(target_model))
-        if self.args.COMMON_AGENTS_NETWORK:
-            agent_model = dir + '/agents_net_params.pt'
-            self.online_net.agents_net.load_state_dict(torch.load(agent_model))
+        
+        if red:
+            self.adversary_net.load_state_dict(torch.load(mixer_model))
+            if self.args.COMMON_AGENTS_NETWORK:
+                agent_model = dir + '/agents_net_params.pt'
+                self.adversary_net.agents_net.load_state_dict(torch.load(agent_model))
+            else:
+                for agent in self.args.red_agents:
+                    agent_model = dir + '/agent_nets_params/' + agent +'.pt'
+                    self.adversary_net.agents_nets[agent].load_state_dict(torch.load(agent_model))
+            with open(f'{dir}/loading_parameters.bin',"rb") as f:
+                self.loading_parameters = pickle.load(f)
+            self.opposing_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
+
         else:
-            for agent in self.args.blue_agents:
-                agent_model = dir + '/agent_nets_params/' + agent +'.pt'
-                self.online_net.agents_nets[agent].load_state_dict(torch.load(agent_model))
-        with open(f'{dir}/loading_parameters.bin',"rb") as f:
-            self.loading_parameters = pickle.load(f)
-        self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
+            self.online_net.load_state_dict(torch.load(mixer_model))
+            self.target_net.load_state_dict(torch.load(target_model))
+            if self.args.COMMON_AGENTS_NETWORK:
+                agent_model = dir + '/agents_net_params.pt'
+                self.online_net.agents_net.load_state_dict(torch.load(agent_model))
+            else:
+                for agent in self.args.blue_agents:
+                    agent_model = dir + '/agent_nets_params/' + agent +'.pt'
+                    self.online_net.agents_nets[agent].load_state_dict(torch.load(agent_model))
+            with open(f'{dir}/loading_parameters.bin',"rb") as f:
+                self.loading_parameters = pickle.load(f)
+            self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
 
     def train(self, step):
           
@@ -405,6 +429,7 @@ class Runner:
                             action = None
                         _, self.blue_team_buffers.hidden_state_next[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
                         self.blue_team_buffers.action[agent] = action
+                    
                     self.env.step(action)
                     
                     self.visualize()
@@ -444,6 +469,7 @@ class Runner:
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
                     if done:
                         action = None
+                    self.opposing_team_buffers.action[agent] = action
                     
                     
                 else:
@@ -453,7 +479,7 @@ class Runner:
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
                     if done:
                         action = None
-                    
+                    self.blue_team_buffers.action[agent] = action
                 self.env.step(action)
                 
                 self.visualize()
@@ -466,6 +492,9 @@ class Runner:
                 self.env.reset()
                 if self.args.TENSORBOARD:
                     self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
+                    self.writer.add_scalar("Steps", self.blue_team_buffers.nb_transitions,step  )
+                    self.writer.add_scalar("Win", int(self.winner_is_blue()),step  )
+                
                 self.reset_buffers()
                 #self.train(step) #training only after each episode
             self.blue_team_buffers.replay_buffer.append(self.transition)
@@ -548,16 +577,17 @@ class Runner:
 def main(argv):
     env = defense_v0.env(terrain=TERRAIN, max_cycles=constants.EPISODE_MAX_LENGTH, max_distance=constants.MAX_DISTANCE )
     env.reset()
-    args = Args(env)
-    args.MODEL_DIR = MODEL_DIR
-    args.RUN_NAME = RUN_NAME
-    args.ADVERSARY_TACTIC = ADVERSARY_TACTIC
-    runner = Runner(env, args)
+    args_runner = Args(env)
+    args_runner.MODEL_DIR = MODEL_DIR
+    args_runner.RUN_NAME = RUN_NAME
+    args_runner.ADVERSARY_TACTIC = ADVERSARY_TACTIC
+    
     try:
-        opts, args = getopt.getopt(argv,"hl:e:",["load_model=","eval_model="])
+        opts, args = getopt.getopt(argv,"ha:l:e:",["load_adversary","load_model=","eval_model="])
     except getopt.GetoptError:
         print('error')
     if len(argv) == 0:
+        runner = Runner(env, args_runner)
         runner.run()
     for opt, arg in opts:
         if opt == '-h':
@@ -566,10 +596,15 @@ def main(argv):
             print('OR')
             print('q_mix.py  -e <model_folder_to_eval>')
             sys.exit()
+        elif opt in ('-a', "--load_adversary"):
+            args_runner.ADVERSARY_MODEL = arg
+            args_runner.ADVERSARY_TACTIC = 'qmix'
         elif opt in ("-l", "--load_model"):
-            runner.args.MODEL_TO_LOAD = arg
+            args_runner.MODEL_TO_LOAD = arg
+            runner = Runner(env, args_runner)
             runner.run()
         elif opt in ("-e", "--eval_model"):
+            runner = Runner(env, args_runner)
             runner.eval(arg)
 
 

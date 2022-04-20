@@ -8,7 +8,6 @@ class DQNArgs:
     def __init__(self, env):
             
         self.BUFFER_SIZE = 2000
-        self.REW_BUFFER_SIZE = 10000
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
@@ -22,11 +21,12 @@ class DQNArgs:
         self.PRINT_LOGS = False
         self.VISUALIZE_WHEN_LEARNED = True
         self.VISUALIZE_AFTER = 5000000
-        self.VISUALIZE = False
+        self.VISUALIZE = True
         self.WAIT_BETWEEN_STEPS = 0.01
         self.GREEDY = True
         #logging
         self.TENSORBOARD = True
+        self.REW_BUFFER_SIZE = 10000
         #save and reload model
         self.SAVE_CYCLE = 50000
         self.MODEL_DIR = 'defense_params_dqn'
@@ -44,13 +44,14 @@ class DQNArgs:
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
         self.ADVERSARY_TACTIC = 'random'
+        self.ADVERSARY_MODEL = ''
         self.params(env)
 
     def params(self, env):  #environment specific parameters calculation
         
         self.blue_agents = [key for key in env.agents if re.match(rf'^{self.TEAM_TO_TRAIN}',key)]
         self.all_agents = env.agents
-        self.opposing_agents = [key for key in env.agents if re.match(rf'^{self.OPPOSING_TEAM}',key)]
+        self.red_agents = [key for key in env.agents if re.match(rf'^{self.OPPOSING_TEAM}',key)]
         self.n_blue_agents = len(self.blue_agents)
         agent = self.blue_agents[0]
         self.nb_inputs_agent = np.prod(env.observation_space(agent).spaces['obs'].shape)
@@ -69,7 +70,7 @@ class QMIXArgs:
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
         self.LEARNING_RATE = 0.5e-4
-        self.MIN_BUFFER_LENGTH = 300
+        self.MIN_BUFFER_LENGTH = 30000
         self.BATCH_SIZE = 64
         self.GAMMA = 0.95
         self.EPSILON_START = 1
@@ -80,7 +81,7 @@ class QMIXArgs:
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
         self.VISUALIZE_AFTER = 20000000
-        self.VISUALIZE = False
+        self.VISUALIZE = True
         self.WAIT_BETWEEN_STEPS = 0.0001
         self.GREEDY = True
         #logging
@@ -109,6 +110,7 @@ class QMIXArgs:
     def params(self, env):  #environment specific parameters calculation
         
         self.blue_agents = [key for key in env.agents if re.match(rf'^{self.TEAM_TO_TRAIN}',key)]
+        self.red_agents = [key for key in env.agents if re.match(rf'^{self.OPPOSING_TEAM}',key)]
         self.all_agents = env.agents
         self.opposing_agents = [key for key in env.agents if re.match(rf'^{self.OPPOSING_TEAM}',key)]
         self.n_blue_agents = len(self.blue_agents)
