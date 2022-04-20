@@ -21,7 +21,7 @@ class DQNArgs:
         self.PRINT_LOGS = False
         self.VISUALIZE_WHEN_LEARNED = True
         self.VISUALIZE_AFTER = 5000000
-        self.VISUALIZE = True
+        self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.01
         self.GREEDY = True
         #logging
@@ -81,7 +81,7 @@ class QMIXArgs:
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
         self.VISUALIZE_AFTER = 20000000
-        self.VISUALIZE = True
+        self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.0001
         self.GREEDY = True
         #logging
