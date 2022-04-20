@@ -111,25 +111,34 @@ class Runner:
         if all(element == 0 for element in obs['action_mask']):
             return None
         return random.choice(mask_array(range(self.env.action_space(agent).n), obs['action_mask']))
-    def update_buffer(self, agent, action):
-        if action == None:
-            action = -1
-            reward = 0
-            done = True
-        else:
-            reward = self.env._cumulative_rewards[agent]
-            done = self.env.dones[agent]
+    def update_buffer(self):
+        for agent in self.env.agents:
             
-        if self.is_opposing_team(agent):
-            self.opposing_team_buffers.observation_next[agent] = self.env.observe(agent)
-            self.opposing_team_buffers.episode_reward += reward
-            #store transition ?
-            self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
-        else:
-            self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
-            self.blue_team_buffers.episode_reward += reward
-            self.transition[agent] = [self.blue_team_buffers.observation[agent], action,reward,done,self.blue_team_buffers.observation_next[agent]]
-            self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
+            if self.is_opposing_team(agent):
+                if self.opposing_team_buffers.action[agent] == None:
+                    self.opposing_team_buffers.action[agent] = -1
+                    reward = 0
+                    done = True
+                else:
+                    reward = self.env._cumulative_rewards[agent]
+                    done = self.env.dones[agent]
+                
+                self.opposing_team_buffers.observation_next[agent] = self.env.observe(agent)
+                self.opposing_team_buffers.episode_reward += reward
+                #store transition ?
+                self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
+            else:
+                if self.blue_team_buffers.action[agent] == None:
+                    self.blue_team_buffers.action[agent] = -1
+                    reward = 0
+                    done = True
+                else:
+                    reward = self.env._cumulative_rewards[agent]
+                    done = self.env.dones[agent]
+                self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
+                self.blue_team_buffers.episode_reward += reward
+                self.transition[agent] = [self.blue_team_buffers.observation[agent], self.blue_team_buffers.action[agent],reward,done,self.blue_team_buffers.observation_next[agent]]
+                self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
             
         return done
     def step_buffer(self):
@@ -248,16 +257,19 @@ class Runner:
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
+                    if done:
+                        action = None
+                    self.opposing_team_buffers.action[agent] = action
                     
                 else:
                     self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.random_action(agent, self.blue_team_buffers.observation[agent])
-                    
-                if done:
-                    action = None   
+                    if done:
+                        action = None
+                    self.blue_team_buffers.action[agent] = action
                 self.env.step(action)
                 self.visualize()
-                self.update_buffer(agent, action)
+            self.update_buffer()
             
             
             #self.complete_transition()
@@ -289,19 +301,21 @@ class Runner:
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
-                    
+                    if done:
+                        action = None
+                    self.opposing_team_buffers.action[agent] = action
                 else:
                     self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
                     action = self.online_nets[agent].act(self.blue_team_buffers.observation[agent])
                     if rnd_sample <= epsilon and self.args.GREEDY:
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
-                if done:
-                    action = None
-                    
+                    if done:
+                        action = None
+                    self.blue_team_buffers.action[agent] = action
                 self.env.step(action)
                 self.visualize()
-                self.update_buffer(agent, action)
-            
+                
+            self.update_buffer()
             #self.complete_transition()
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
                 #self.give_global_reward()

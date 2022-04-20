@@ -22,7 +22,7 @@ class Metrics:
 
 class Buffers:
     def __init__(self, env, args, agents, device):
-        
+        self.action = dict()
         self.observation = dict()
         self.observation_next = dict()
         self.hidden_state = dict()

@@ -9,7 +9,7 @@ class DQNArgs:
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 10000
-        self.LEARNING_RATE = 0.5e-4
+        self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
         self.GAMMA = 0.95

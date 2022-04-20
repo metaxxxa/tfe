@@ -105,7 +105,7 @@ class QMixer(nn.Module):
         max_q_index = torch.argmax(masked_q_values, dim=-1).item()
         max_q = masked_q_values[max_q_index] 
         if all_q_values != None: #only in case a mask is given
-            max_q_index = ((all_q_values == max_q.item()).cpu() * (obs['action_mask'] == 1)).nonzero(as_tuple=True)[1][0].item()
+            max_q_index = ((all_q_values == max_q.item()).cpu() * (obs['action_mask'] == 1)).nonzero(as_tuple=True)[-1][0].item()
         return max_q_index, max_q
 
 
@@ -151,7 +151,9 @@ class Runner:
             from torch.utils.tensorboard import SummaryWriter
             self.writer = SummaryWriter()
             from Utils.plotter import plot_nn
+
             plot_nn(self.online_net.get_agent_nets(self.args.blue_agents[0]), 'QMIX Agent') #to visualize the neural network
+            
             plot_nn(self.online_net, 'QMIX Mixer')
             args.log_params(self.writer, 'qmixlin', TERRAIN)
             self.writer.add_graph(self.online_net.get_agent_nets(self.args.blue_agents[0]),(torch.empty((self.args.observations_dim),device=device), torch.empty((1, self.args.dim_L2_agents_net),device=device)) )
@@ -164,32 +166,35 @@ class Runner:
         if all(element == 0 for element in obs['action_mask']):
             return None
         return random.choice(mask_array(range(self.env.action_space(agent).n), obs['action_mask']))
-    def update_buffer(self, agent, action):
-        if action == None:
-            action = -1
-            reward = -0.01
-            done = True
-        else:
-            reward = self.env._cumulative_rewards[agent]
-            done = self.env.dones[agent]
+    def update_buffer(self):
+        for agent in self.env.agents:
             
-        if self.is_opposing_team(agent):
-            
-            self.opposing_team_buffers.observation_next[agent] = self.env.observe(agent)
-            self.opposing_team_buffers.episode_reward += reward
-            
-            #self.transition[agent] = (self.opposing_team_buffers.observation_next[agent], action,reward,done,self.opposing_team_buffers.observation[agent],self.opposing_team_buffers.hidden_state_next[agent], self.opposing_team_buffers.hidden_state[agent])
-            self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
-            #self.opposing_team_buffers.hidden_state[agent] = self.opposing_team_buffers.hidden_state_next[agent]
-        else:
-            
-            self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
-            
-            self.blue_team_buffers.episode_reward += reward
-            self.transition[agent] = [self.blue_team_buffers.observation[agent], action,reward,done,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
-            self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
-            self.blue_team_buffers.hidden_state[agent] = self.blue_team_buffers.hidden_state_next[agent]
-            
+            if self.is_opposing_team(agent):
+                if self.opposing_team_buffers.action[agent] == None:
+                    self.opposing_team_buffers.action[agent] = -1
+                    reward = 0
+                    done = True
+                else:
+                    reward = self.env._cumulative_rewards[agent]
+                    done = self.env.dones[agent]
+                
+                self.opposing_team_buffers.observation_next[agent] = self.env.observe(agent)
+                self.opposing_team_buffers.episode_reward += reward
+                #store transition ?
+                self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
+            else:
+                if self.blue_team_buffers.action[agent] == None:
+                    self.blue_team_buffers.action[agent] = -1
+                    reward = 0
+                    done = True
+                else:
+                    reward = self.env._cumulative_rewards[agent]
+                    done = self.env.dones[agent]
+                self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
+                self.blue_team_buffers.episode_reward += reward
+                self.transition[agent] = [self.blue_team_buffers.observation[agent], self.blue_team_buffers.action[agent],reward,done,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
+                self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
+        
         
     def step_buffer(self):
         self.blue_team_buffers.nb_transitions += 1
@@ -328,13 +333,15 @@ class Runner:
                 rewards_t[transition_nb][agent_nb] = t[agent][2]
                 dones_t[transition_nb][agent_nb] = t[agent][3]
                 next_obses_t[transition_nb][self.args.observations_dim*agent_nb:(self.args.observations_dim*(agent_nb+1))] = torch.as_tensor(t[agent][4]['obs'], dtype=torch.float32, device=device)
+                target_q_values = self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0].squeeze(0)
+                masked_target_q = torch.masked_select(target_q_values, torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device))
+                Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(masked_target_q, t[agent][4], target_q_values)[1].detach()
                 if t[agent][1] == -1:
                     Q_action_online_t[transition_nb][agent_nb] = 0
+                    Q_ins_target_t[transition_nb][agent_nb] = 0  #if agent is done also set target q value to 0 ?
                 else:
                     Q_action_online_t[transition_nb][agent_nb] = torch.gather(self.online_net.get_Q_values(agent, t[agent][0], t[agent][5])[0].squeeze(0), 0,torch.tensor([t[agent][1]], device=device))
-                target_q_values = self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0]
-                masked_target_q = torch.masked_select(target_q_values.squeeze(0), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device))
-                Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(masked_target_q, t[agent][4], target_q_values)[1].detach()
+                
                 
                 agent_nb += 1
                 
@@ -389,6 +396,7 @@ class Runner:
                         action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
                         if done:
                             action = None
+                        self.opposing_team_buffers.action[agent] = action
                     
                     else:
                         self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
@@ -396,15 +404,15 @@ class Runner:
                         if done:
                             action = None
                         _, self.blue_team_buffers.hidden_state_next[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
-                    
+                        self.blue_team_buffers.action[agent] = action
                     self.env.step(action)
-                    self.update_buffer(agent, action)
+                    
                     self.visualize()
 
                     #update buffer here
                     
                 
-                
+                self.update_buffer()
                 self.complete_transition()
                 if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
                     self.give_global_reward()
@@ -447,9 +455,9 @@ class Runner:
                         action = None
                     
                 self.env.step(action)
-                self.update_buffer(agent, action)
+                
                 self.visualize()
-            
+            self.update_buffer()
             self.complete_transition()
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
                 self.give_global_reward()

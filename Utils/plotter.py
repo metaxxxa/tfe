@@ -71,7 +71,7 @@ def plot_nn(model, algo):
     network.visualize()
 
 def plot_tensorboard_log(json_file, data_type, algo, env, name, size=(10,5)):
-    filter_factor = 13
+    filter_factor = 200
     f = open(json_file)
     data = json.load(f)
     step = np.asarray([element[1] for element in data])
@@ -81,12 +81,13 @@ def plot_tensorboard_log(json_file, data_type, algo, env, name, size=(10,5)):
     plt.plot(step, data)
     plt.xlabel('Step')
     if data_type == 'loss':
-        plt.yscale("log") 
+        if algo == 'QMIX':
+            plt.yscale("log") 
         plt.ylabel('Loss /agent /step')
-    elif data_type == 'reward':
-        plt.plot(step, uniform_filter1d(data, size=filter_factor), 'C2', label='Smoothed value')
-        plt.ylabel('Reward /agent')
-        plt.legend()
+        
+    plt.plot(step, uniform_filter1d(data, size=filter_factor), 'C2', label='Smoothed value')
+    plt.ylabel('Reward /agent')
+    plt.legend()
     plt.title(f'{algo} {data_type} on the {env} environment')
 
     fig.savefig(f'figures/{name}.png', bbox_inches='tight', dpi=300)
@@ -94,11 +95,22 @@ def plot_tensorboard_log(json_file, data_type, algo, env, name, size=(10,5)):
     plt.pause(1)
     f.close()
 
-test = 'evals/results_dqn_testt_random.bin'
-compute_results(test)
 
-qmixloss_benchmark = 'toplot/Apr12_16-18-44_qmix_log.json'
-plot_tensorboard_log(qmixloss_benchmark, 'loss', 'QMIX', 'benchmark', 'benchmark/loss_qmix_benchmark')
 
-qmixreward_benchmark = 'toplot/Apr12_16-18-44_milleniumfalcon_qmix_log1.json'
-plot_tensorboard_log(qmixreward_benchmark, 'reward', 'QMIX', 'benchmark', 'benchmark/reward_qmix_benchmark')
+
+if __name__ == "__main__":
+
+    test = 'evals/results_dqn_testt_random.bin'
+    compute_results(test)
+
+    qmixloss_benchmark = 'toplot/Apr12_16-18-44_qmix_log.json'
+    plot_tensorboard_log(qmixloss_benchmark, 'loss', 'QMIX', 'benchmark', 'benchmark/loss_qmix_benchmark')
+
+    qmixreward_benchmark = 'toplot/Apr12_16-18-44_milleniumfalcon_qmix_log1.json'
+    plot_tensorboard_log(qmixreward_benchmark, 'reward', 'QMIX', 'benchmark', 'benchmark/reward_qmix_benchmark')
+
+    dqnloss_benchmark = 'toplot/avril18_21-24-37_DeathStar_dqn_loss.json'
+    plot_tensorboard_log(dqnloss_benchmark, 'loss', 'DQN', 'benchmark', 'benchmark/loss_dqn_benchmark')
+
+    dqnrew_benchmark = 'toplot/avril18_21-24-37_DeathStar_dqn_rew.json'
+    plot_tensorboard_log(dqnrew_benchmark, 'reward', 'DQN', 'benchmark', 'benchmark/reward_dqn_benchmark')
