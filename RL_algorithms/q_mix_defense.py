@@ -199,7 +199,36 @@ class Runner:
                 self.blue_team_buffers.episode_reward += reward
                 self.transition[agent] = [self.blue_team_buffers.observation[agent], self.blue_team_buffers.action[agent],reward,done,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
                 self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
+    
+    def store_transition(self, intitialisation=False): #not adapted for multiple agents
+        if self.args.USE_PER:
+            if intitialisation:
+                p = 1
+                
+            else:
+                p = max(self.blue_team_buffers.priority)
+            
+            self.blue_team_buffers.priority.append(p)
+            w = (self.args.BUFFER_SIZE*(p/sum(self.blue_team_buffers.priority)))**-self.args.B_PER
+            self.blue_team_buffers.weights.append(w)
         
+        self.blue_team_buffers.replay_buffer.append(self.transition)
+
+    def sample(self):
+        if self.args.USE_PER:
+
+            priorities = np.asarray(self.blue_team_buffers.priority)
+            self.index = np.random.choice(range(len(self.blue_team_buffers.replay_buffer)), self.args.BATCH_SIZE, p=(priorities/sum(priorities)))
+            self.weights = np.asarray([self.blue_team_buffers.weights[i] for i in self.index])
+            return [self.blue_team_buffers.replay_buffer[i] for i in self.index]
+        else:
+            return random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
+    
+    def update_priorities(self, error):
+        for i, index in enumerate(self.index):
+            self.blue_team_buffers.priority[index] = (self.args.EPSILON_PER + error[i].item())**self.args.ALPHA_PER
+            nb = (self.args.EPSILON_PER + error[i].item())**self.args.ALPHA_PER
+         
         
     def step_buffer(self):
         self.blue_team_buffers.nb_transitions += 1
@@ -338,7 +367,7 @@ class Runner:
 
     def train(self, step):
           
-        transitions = random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
+        transitions = self.sample()
         obses_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
         actions_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
         Q_ins_target_t = torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)
@@ -388,6 +417,11 @@ class Runner:
         # loss 
         error = y_tot + (-1)*Qtot_online
         
+        if self.args.USE_PER:
+            self.update_priorities(abs(error))
+            error = error * torch.as_tensor(self.weights*max(self.weights), device = device)
+                
+
         loss = error**2
         mean_loss = torch.mean(loss)
         loss = loss.sum()
@@ -446,7 +480,7 @@ class Runner:
                     self.env.reset()
                     
                     self.reset_buffers()
-                self.blue_team_buffers.replay_buffer.append(self.transition)
+                self.store_transition(True)
         # trainingoptim
 
         self.env.reset()
@@ -497,7 +531,7 @@ class Runner:
                 
                 self.reset_buffers()
                 #self.train(step) #training only after each episode
-            self.blue_team_buffers.replay_buffer.append(self.transition)
+            self.store_transition()
             self.train(step)  #training at each step
             
             #self.scheduler.step(np.mean(self.loss_buffer))

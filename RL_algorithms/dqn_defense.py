@@ -150,17 +150,13 @@ class Runner:
                 self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
             
         return done
-    def store_transition(self): #not adapted for multiple agents
+    def store_transition(self, intitialisation=False): #not adapted for multiple agents
         if self.args.USE_PER:
-            
-            reward = 0
-            for agent, t in self.transition.items():
-                reward += t[2]
-                target_maxq = self.target_nets[agent].get_Q_max(torch.masked_select(self.target_nets[agent].get_Q_values(t[4]), torch.as_tensor(t[4]['action_mask'], dtype=torch.bool,device=device)),t[4],  self.target_nets[agent].get_Q_values(t[4]))[1].detach().item()
-            reward = np.mean(reward)
-            target = reward + self.args.GAMMA*(1-self.transition[agent][3])*target_maxq
-            error = abs(self.online_nets[agent](t[0]['obs'])[t[1]].item() - target)
-            p =  (self.args.EPSILON_PER + error)**self.args.ALPHA_PER
+            if intitialisation:
+                p = 1
+                
+            else:
+                p = max(self.blue_team_buffers.priority)
             
             self.blue_team_buffers.priority.append(p)
             w = (self.args.BUFFER_SIZE*(p/sum(self.blue_team_buffers.priority)))**-self.args.B_PER
@@ -172,11 +168,19 @@ class Runner:
         if self.args.USE_PER:
 
             priorities = np.asarray(self.blue_team_buffers.priority)
-            index = np.random.choice(range(len(self.blue_team_buffers.replay_buffer)), self.args.BATCH_SIZE, p=(priorities/sum(priorities)))
-            self.weights = [self.blue_team_buffers.weights[i] for i in index]
-            return [self.blue_team_buffers.replay_buffer[i] for i in index]
+            self.index = np.random.choice(range(len(self.blue_team_buffers.replay_buffer)), self.args.BATCH_SIZE, p=(priorities/sum(priorities)))
+            self.weights = np.asarray([self.blue_team_buffers.weights[i] for i in self.index])
+            return [self.blue_team_buffers.replay_buffer[i] for i in self.index]
         else:
             return random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
+    
+    def update_priorities(self, error):
+        for i, index in enumerate(self.index):
+            self.blue_team_buffers.priority[index] = (self.args.EPSILON_PER + error[i].item())**self.args.ALPHA_PER
+            nb = (self.args.EPSILON_PER + error[i].item())**self.args.ALPHA_PER
+            
+        
+
     def step_buffer(self):
         self.blue_team_buffers.nb_transitions += 1
     def reset_buffer(self, agent):
@@ -327,7 +331,7 @@ class Runner:
                 self.env.reset()
                 
                 self.reset_buffers()
-            self.store_transition()
+            self.store_transition(True)
         # trainingoptim
 
         self.env.reset()
@@ -415,8 +419,10 @@ class Runner:
                 action_q_values = torch.gather(input=q_values, dim=1, index=actions_t).squeeze(-1)
 
                 error = targets - action_q_values
+                
                 if self.args.USE_PER:
-                    error = error * torch.as_tensor(self.weights, device = device)
+                    self.update_priorities(abs(error))
+                    error = error * torch.as_tensor(self.weights*max(self.weights), device = device)
                 loss = error**2
                 loss = loss.sum()
                 # gradient descent
