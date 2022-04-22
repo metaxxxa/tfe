@@ -150,6 +150,33 @@ class Runner:
                 self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
             
         return done
+    def store_transition(self): #not adapted for multiple agents
+        if self.args.USE_PER:
+            
+            reward = 0
+            for agent, t in self.transition.items():
+                reward += t[2]
+                target_maxq = self.target_nets[agent].get_Q_max(torch.masked_select(self.target_nets[agent].get_Q_values(t[4]), torch.as_tensor(t[4]['action_mask'], dtype=torch.bool,device=device)),t[4],  self.target_nets[agent].get_Q_values(t[4]))[1].detach().item()
+            reward = np.mean(reward)
+            target = reward + self.args.GAMMA*(1-self.transition[agent][3])*target_maxq
+            error = abs(self.online_nets[agent](t[0]['obs'])[t[1]].item() - target)
+            p =  (self.args.EPSILON_PER + error)**self.args.ALPHA_PER
+            
+            self.blue_team_buffers.priority.append(p)
+            w = (self.args.BUFFER_SIZE*(p/sum(self.blue_team_buffers.priority)))**-self.args.B_PER
+            self.blue_team_buffers.weights.append(w)
+        
+        self.blue_team_buffers.replay_buffer.append(self.transition)
+
+    def sample(self):
+        if self.args.USE_PER:
+
+            priorities = np.asarray(self.blue_team_buffers.priority)
+            index = np.random.choice(range(len(self.blue_team_buffers.replay_buffer)), self.args.BATCH_SIZE, p=(priorities/sum(priorities)))
+            self.weights = [self.blue_team_buffers.weights[i] for i in index]
+            return [self.blue_team_buffers.replay_buffer[i] for i in index]
+        else:
+            return random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
     def step_buffer(self):
         self.blue_team_buffers.nb_transitions += 1
     def reset_buffer(self, agent):
@@ -300,7 +327,7 @@ class Runner:
                 self.env.reset()
                 
                 self.reset_buffers()
-            self.blue_team_buffers.replay_buffer.append(self.transition)
+            self.store_transition()
         # trainingoptim
 
         self.env.reset()
@@ -350,11 +377,11 @@ class Runner:
                 self.env.reset()
                 self.reset_buffers()
 
-            self.blue_team_buffers.replay_buffer.append(self.transition)
+            self.store_transition()
             
             
 
-            transitions = random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
+            transitions = self.sample()
             loss_sum = 0
             for agent in self.args.blue_agents: #in case we use IDQN
         
@@ -388,6 +415,8 @@ class Runner:
                 action_q_values = torch.gather(input=q_values, dim=1, index=actions_t).squeeze(-1)
 
                 error = targets - action_q_values
+                if self.args.USE_PER:
+                    error = error * torch.as_tensor(self.weights, device = device)
                 loss = error**2
                 loss = loss.sum()
                 # gradient descent
@@ -527,7 +556,7 @@ def main(argv):
     except getopt.GetoptError:
         print('error')
     if len(argv) == 0:
-        runner = Runner(env, args)
+        runner = Runner(env, args_runner)
         runner.run()
     for opt, arg in opts:
         if opt == '-h':

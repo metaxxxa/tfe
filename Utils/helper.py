@@ -30,6 +30,9 @@ class Buffers:
         self.episode_reward = 0.0
         self.nb_transitions = 0
         self.replay_buffer = deque(maxlen=args.BUFFER_SIZE)
+        if args.USE_PER:
+            self.priority = deque(maxlen=args.BUFFER_SIZE)
+            self.weights = deque(maxlen=args.BUFFER_SIZE)
         self.rew_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
         self.loss_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)
         self.steps_buffer = deque([0.0], maxlen=args.REW_BUFFER_SIZE)

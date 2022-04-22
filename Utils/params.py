@@ -17,6 +17,10 @@ class DQNArgs:
         self.EPSILON_DECAY = 400000
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*2
+        self.USE_PER = True
+        self.EPSILON_PER = 0.01
+        self.ALPHA_PER = 0.6
+        self.B_PER = 0.4
         #visualization parameters
         self.PRINT_LOGS = False
         self.VISUALIZE_WHEN_LEARNED = True
@@ -78,6 +82,10 @@ class QMIXArgs:
         self.EPSILON_DECAY = 500000
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*2
+        self.USE_PER = True
+        self.EPSILON_PER = 0.01
+        self.ALPHA_PER = 0.6
+        self.B_PER = 0.4
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
         self.VISUALIZE_AFTER = 20000000
