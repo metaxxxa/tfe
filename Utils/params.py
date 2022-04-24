@@ -19,7 +19,7 @@ class DQNArgs:
         self.STOP_TRAINING = self.EPSILON_DECAY*2
         self.USE_PER = True
         self.EPSILON_PER = 0.0001
-        self.ALPHA_PER = 0.5
+        self.ALPHA_PER = 0.3
         self.B_PER = 0.1
         #visualization parameters
         self.PRINT_LOGS = False

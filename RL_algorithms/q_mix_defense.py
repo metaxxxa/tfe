@@ -31,7 +31,7 @@ device = get_device()
 
 #environment constants
 constants = Constants()
-TERRAIN = 'benchmark_10x10_2v2'
+TERRAIN = 'benchmark_10x10_1v1'
 
 MODEL_DIR = 'defense_params_qmix'
 RUN_NAME = 'benchmarking'
@@ -463,7 +463,6 @@ class Runner:
                             action = None
                         _, self.blue_team_buffers.hidden_state_next[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
                         self.blue_team_buffers.action[agent] = action
-                    
                     self.env.step(action)
                     
                     self.visualize()
@@ -523,12 +522,12 @@ class Runner:
                 self.give_global_reward()
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
-                self.env.reset()
+                
                 if self.args.TENSORBOARD:
                     self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
                     self.writer.add_scalar("Steps", self.blue_team_buffers.nb_transitions,step  )
                     self.writer.add_scalar("Win", int(self.winner_is_blue()),step  )
-                
+                self.env.reset()
                 self.reset_buffers()
                 #self.train(step) #training only after each episode
             self.store_transition()
