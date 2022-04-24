@@ -14,13 +14,13 @@ class DQNArgs:
         self.GAMMA = 0.95
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 400000
+        self.EPSILON_DECAY = 50000
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*2
         self.USE_PER = True
-        self.EPSILON_PER = 0.01
-        self.ALPHA_PER = 0.6
-        self.B_PER = 0.4
+        self.EPSILON_PER = 0.0001
+        self.ALPHA_PER = 0.5
+        self.B_PER = 0.1
         #visualization parameters
         self.PRINT_LOGS = False
         self.VISUALIZE_WHEN_LEARNED = True

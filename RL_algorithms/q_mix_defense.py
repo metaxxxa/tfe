@@ -419,7 +419,7 @@ class Runner:
         
         if self.args.USE_PER:
             self.update_priorities(abs(error))
-            error = error * torch.as_tensor(self.weights*max(self.weights), device = device)
+            error = error * torch.as_tensor(self.weights/max(self.weights), device = device)
                 
 
         loss = error**2
