@@ -72,6 +72,7 @@ class QMixer(nn.Module):
         else:
             for agent in args.blue_agent:
                 self.net_params += list(self.agents_nets[agent].parameters())
+        self.optimizer = torch.optim.Adam(self.net_params, lr = self.args.LEARNING_RATE)
 
     def get_agent_nets(self, agent):
         if self.args.COMMON_AGENTS_NETWORK:
@@ -96,8 +97,8 @@ class QMixer(nn.Module):
         
     def get_Q_values(self, agent, obs,hidden_state):
         obs_t = torch.as_tensor(obs['obs'], dtype=torch.float32,device=device)
-        q_values, hidden_state = self.get_agent_nets(agent)(obs_t, hidden_state)
-        return q_values, hidden_state
+        q_values, hidden_state_next = self.get_agent_nets(agent)(obs_t, hidden_state)
+        return q_values, hidden_state_next
 
     def get_Q_max(self, masked_q_values, obs, all_q_values=None):
         if len(masked_q_values) == 0:
@@ -159,7 +160,7 @@ class Runner:
             self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
 , torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
         self.sync_networks()
-        self.optimizer = torch.optim.Adam(self.online_net.net_params, lr = self.args.LEARNING_RATE)
+        
         
         if self.args.ADVERSARY_TACTIC == 'qmix':
             self.adversary_net =QMixer(self.env, self.args)
@@ -411,11 +412,11 @@ class Runner:
         # targets
         Qtot_max_target = self.target_net.forward(next_obses_t, Q_ins_target_t).detach()
         Qtot_online = self.online_net.forward(obses_t, Q_action_online_t)
-        y_tot = rewards_t + self.args.GAMMA*(1 + (-1)*all_agents_done_t)*Qtot_max_target
+        y_tot = rewards_t + self.args.GAMMA*(1 - 1*all_agents_done_t)*Qtot_max_target
 
     ########### busy
         # loss 
-        error = y_tot + (-1)*Qtot_online
+        error = y_tot -Qtot_online
         
         if self.args.USE_PER:
             self.update_priorities(abs(error))
@@ -432,9 +433,9 @@ class Runner:
 
 
         # gradient descent
-        self.optimizer.zero_grad()
+        self.online_net.optimizer.zero_grad()
         loss.backward()
-        self.optimizer.step()
+        self.online_net.optimizer.step()
 
     def run(self):
         

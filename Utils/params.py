@@ -14,14 +14,14 @@ class DQNArgs:
         self.GAMMA = 0.95
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 50000
+        self.EPSILON_DECAY = 10000
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*2
         self.USE_PER = False
         self.EPSILON_PER = 0.0001
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
-        self.DOUBLE_DQN = True
+        self.DOUBLE_DQN = False
         self.CONVOLUTIONAL_INPUT = True
         #visualization parameters
         self.PRINT_LOGS = False
@@ -75,13 +75,13 @@ class QMIXArgs:
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
-        self.LEARNING_RATE = 0.5e-4
-        self.MIN_BUFFER_LENGTH = 30000
+        self.LEARNING_RATE = 1e-4
+        self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
         self.GAMMA = 0.95
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 10000
+        self.EPSILON_DECAY = 50000
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*2
         self.USE_PER = False
