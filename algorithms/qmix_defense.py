@@ -7,28 +7,16 @@ Comments:
     * Uses QMixer
 
 
-Applied to **Simple Spread**:
-This environment has N agents, N landmarks (default N=3). At a high level, agents must learn
-to cover all the landmarks while avoiding collisions.
-More specifically, all agents are globally rewarded based on how far the closest agent is to
-each landmark (sum of the minimum distances). Locally, the agents are penalized if they 
-collide with other agents (-1 for each collision). The relative weights of these rewards can
-be controlled with the local_ratio parameter.
-
-Agent observations: [self_vel, self_pos, landmark_rel_positions,
-                     other_agent_rel_positions, communication]
-
-Agent action space: [no_action, move_left, move_right, move_down, move_up]
-
-Arguments
-simple_spread_v2.env(N=3, local_ratio=0.5, max_cycles=25, continuous_actions=False)
-N: number of agents and landmarks
-
-local_ratio: Weight applied to local reward and global reward. Global reward weight will always be 1 - local reward weight.
-
-max_cycles: number of frames (a step for each agent) until game terminates
-
-continuous_actions: Whether agent action spaces are discrete(default) or continuous
+Applied to **defense**:
+    * observation is a dictionary with keys:
+        'obs': the actual observation as a ndarry containing:
+            * self: pos_x, pos_y, alive flag, remaining ammo, aiming (-1 if not)
+            * team: same information for agents of own team
+            * others: same information for agents of other team
+            * obstacles: pos_x and pos_y for obstacles
+        'action_mask': Box of lenght len(actions) with: 
+            0 : action not allowed
+            1 : action allowed
 """
 import copy
 import random
@@ -51,27 +39,12 @@ from helpers import build_network, transform_episode
 
 from torch.utils.tensorboard import SummaryWriter
 
-ENVIRONMENT = simple_spread_v2
-"""
-   **Simple Spread**
-   Multi-agent coordination game
-    This environment has N agents, N landmarks (default N=3). At a high level, agents must learn to cover all the
-    landmarks while avoiding collisions. More specifically, all agents are globally rewarded based on how far the
-    closest agent is to each landmark (sum of the minimum distances). Locally, the agents are penalized if they
-    collide with other agents (-1 for each collision). The relative weights of these rewards can be controlled with
-    the local_ratio parameter.
 
-    Agent observations: [self_vel, self_pos, landmark_rel_positions, other_agent_rel_positions, communication]
-    Agent action space: [no_action, move_left, move_right, move_down, move_up]
+# hack to allow import of env
+import sys; sys.path.insert(0, '.')
+from env import defense_v0
+ENVIRONMENT = defense_v0
 
-    Arguments
-        simple_spread_v2.env(N=3, local_ratio=0.5, max_cycles=25, continuous_actions=False)
-        * N: number of agents and landmarks
-        * local_ratio: Weight applied to local reward and global reward. Global reward
-        weight will always be 1 - local reward weight.
-        * max_cycles: number of frames (a step for each agent) until game terminates
-        * continuous_actions: Whether agent action spaces are discrete(default) or continuous
-"""
 OPTIMIZER =  optim.Adam # optim.RMSprop #
 LOCAL_RATIO = 0. #3 #1 # trade-off between local (collisions) and global reward (close to landmarks)
 
@@ -91,22 +64,47 @@ def untangle(batch):
     rewards      = torch.tensor([[step[agent].reward for agent in step] for step in batch]).to(device)
     dones        = torch.tensor([[step[agent].done for agent in step] for step in batch], dtype=torch.float32).to(device)
     states       = torch.from_numpy(np.stack([[step[agent].state for agent in step] for step in batch])).to(device)
-    next_states = torch.from_numpy(np.stack([[step[agent].next_state for agent in step] for step in batch])).to(device)
-    return observations, actions, rewards.T, dones.T, next_obs, states, next_states
+    next_states  = torch.from_numpy(np.stack([[step[agent].next_state for agent in step] for step in batch])).to(device)
+    masks        = torch.from_numpy(np.stack([[step[agent].mask for agent in step] for step in batch])).to(device)
+    next_masks   = torch.from_numpy(np.stack([[step[agent].next_mask for agent in step] for step in batch])).to(device)
+    return observations, masks, actions, rewards.T, dones.T, next_obs, next_masks, states, next_states
+
+class EpisodeStep:
+    def __init__(self, observation, mask, action, reward, done, next_obs, next_mask, state, next_state):
+        self.observation = observation
+        self.mask = mask
+        self.action = action
+        self.reward = reward
+        self.done = done
+        self.next_obs = next_obs
+        self.next_mask = next_mask
+        self.state = state
+        self.next_state = next_state
+    
+    def __iter__(self):
+        all = self.__dict__.values()
+        return iter(all)
+    
+    def __repr__(self):
+        s  = f"observation = {self.observation}\n" 
+        s += f"action = {self.action}\n"
+        s += f"reward = {self.reward}\n"
+        s += f"done = {self.done}\n"
+        s += f"next_obs = {self.next_obs}\n"
+        return s
 
 class QMixRunner(Runner):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.init_params(kwargs)
-        self.env = ENVIRONMENT.env(N=self.n_agents, max_cycles=self.episode_length,
-                                   local_ratio=LOCAL_RATIO)
+        self.env = ENVIRONMENT.env(terrain="flat_5x5", max_cycles=self.episode_length, max_distance=4)
         self.env.reset()
         
         
         N = len(self.env.agents)
-        dims = self.env.observation_space('agent_0').shape[0]
+        dims = self.env.observation_space('blue_0')['obs'].shape[0]
         # dims = 4 + 2 * N + 2 * (N - 1) + 2 * (N-1) # vx, vy, x, y, [landmark.x, landmark.y], [other.x, other.y], comms
-        n_actions = self.env.action_space('agent_0').n
+        n_actions = self.env.action_space('blue_0').n
         # n_actions = 5 # [no_action, move_left, move_right, move_down, move_up]
         self.net = build_network([dims, *self.layers, n_actions]).to(device)
 
@@ -167,7 +165,6 @@ class QMixRunner(Runner):
         s += f"{'with' if self.use_mixer else 'without'} mixer  \n"
         s += f"device = {device}  \n"
         s += f"identifier = {self.rand_idx}  \n"
-        s += f"\nfinal reward = {self.eval(self.n_evals)[0]:4.3f}"
         return s
     
     def run(self, n_iters=10):
@@ -187,8 +184,7 @@ class QMixRunner(Runner):
                 for idx, agent in enumerate(self.agents):
                     agent_actions = [a[agent] for a in actions]
                     observation = torch.from_numpy(np.stack([o[agent] for o in observations])).float().to(device)
-                    Qs = self.agents[agent].net(observation)
-                    qs[idx, :] = Qs[range(len(observations)), agent_actions]
+                    qs[idx, :] = self.agents[agent].net(observation)[range(len(observations)), agent_actions]
                     next_o = torch.from_numpy(np.stack([o[agent] for o in next_obs])).float().to(device)
                     next_qs[idx, :] = self.agents[agent].target_net(next_o).max(dim=1)[0].detach()
 
@@ -200,7 +196,7 @@ class QMixRunner(Runner):
                     qs = self.mixer(qs.T, states) # = Qtot
                     next_qs = self.target_mixer(next_qs.T, next_states).detach()                                           
                     
-                q_target = rewards + self.gamma * (1 - dones) * next_qs # no mixer -> broadcasting for all agents?
+                q_target = rewards + self.gamma * (1 - dones) * next_qs
                 loss = F.mse_loss(qs, q_target)
 
                 self.optimizer.zero_grad()
@@ -219,20 +215,56 @@ class QMixRunner(Runner):
                     agent.save(self.rand_idx)
                 if self.use_mixer:
                     self.target_mixer.load_state_dict(self.mixer.state_dict())
-                
-
-    def log(self, indx, n_iters, cum_loss):
-        avg_reward, std_reward = self.eval(self.n_evals)
-        if self.verbose:
-            print(f"{indx+1}/{n_iters}: avg loss = {cum_loss/self.n_batches:5.4f} | avg reward = {avg_reward:4.3f}")
-        self.writer.add_scalar('avg_reward', avg_reward, indx)
-        self.writer.add_scalar('avg_loss', cum_loss/self.n_batches, indx)
-        self.writer.add_scalar('epsilon', self.epsilon, indx)
+    
+    def generate_episode(self, render=False, train=True):
+        self.env.reset()
+        episode = {agent: [] for agent in self.env.agents}
+        done = False
+        for agent in self.env.agent_iter():
+            if render:
+                self.env.render()
+            observation, reward, done, _ =  self.env.last()
+            obs = observation['obs']
+            mask = observation['action_mask']
+            state = self.env.state()
+            # set observation, done and reward as next_obs of previous step
+            if episode[agent]:
+                episode[agent][-1].next_obs = obs
+                episode[agent][-1].next_mask = mask
+                episode[agent][-1].next_state = state
+                episode[agent][-1].reward = reward
+                episode[agent][-1].done = done
+            action = None if done else self.agents[agent].get_action(obs, mask, epsilon=self.epsilon if train else 0.0)
+            self.env.step(action)
+            episode[agent].append(EpisodeStep(observation, mask, action, None, None, None, None, state, None))
+            if train:
+                self.epsilon = max(self.epsilon-self.eps_decay, self.eps_min)
+        return transform_episode(episode)
+    
+    def log(self, indx, losses):
+        avg_rwd, std_rwd, avg_length = self.eval(self.n_evals)
+        for agent in self.learners:
+            avg_loss, std_loss = np.mean(losses[agent]), np.std(losses[agent])
+            if self.verbose:
+                print(f"{indx} - {agent:11s}: loss = {avg_loss:5.4f}, avg reward = {avg_rwd[agent]:5.4f}")
+            self.writers[agent].add_scalar('avg_loss', avg_loss, indx)
+            self.writers[agent].add_scalar('avg_reward', avg_rwd[agent], indx)
+            self.writers[agent].add_scalar('avg_length', avg_length, indx)
 
     def eval(self, n):
-        episodes = [self.generate_episode(train=False) for _ in range(n)]
-        rewards = [np.sum([step['agent_0'].reward for step in episode[:-1]]) for episode in episodes]
-        return np.mean(rewards), np.std(rewards)
+        rewards = {agent: [] for agent in self.agents}
+        lengths = []
+        for _ in range(n):
+            episode = self.generate_episode(train=False)
+            for agent in self.agents:
+                rewards[agent].append(np.sum([step[agent].reward for step in episode[:-1]]))
+            lengths.append(len(episode))
+        means, stds = {}, {}
+        for agent in self.agents:
+            means[agent] = np.mean(rewards[agent]) # TODO: better solution (eg. divide by initial reward)
+            stds[agent]  = np.std(rewards[agent]) 
+
+        return means, stds, np.mean(lengths)
 
 class DQNAgent:
     def __init__(self, name, actions, net):
@@ -242,13 +274,15 @@ class DQNAgent:
         self.target_net = copy.deepcopy(self.net)
         self.epsilon = 1.0
 
-    def get_action(self, observation, epsilon=0.0):
+    def get_action(self, observation, action_mask, epsilon=0.0):
         if np.random.rand() < epsilon:
-            action = np.random.choice(self.actions)
+            p = action_mask/sum(action_mask)
+            action = np.random.choice(range(len(action_mask)), p=p)
         else:
             with torch.no_grad():
-                qs = self.net(torch.from_numpy(observation).to(device))
-            action = qs.argmax(axis=0).item()
+                qs = self.net(torch.from_numpy(observation).float().to(device))
+                qs[action_mask == 0.0] = -np.infty # set all invalid actions to lowest q_value possible
+                action = qs.argmax(axis=0).item()
         return action
     
     def sync(self):
@@ -325,7 +359,7 @@ def demo():
     * gamma = 0.9
     * learning_rate = 0.001
     * sync_rate = 100
-    Gives good result for simple_spread_v2 after 800 iterations
+    Gives good result for spread_v2 after 200 iterations
     """
 
     import argparse

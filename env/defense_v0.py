@@ -176,7 +176,7 @@ class Agent:
             x0, y0 = other.x, other.y
 
         aim = self.aim.id if self.aim != -1 else -1
-        return np.array([self.x-x0, self.y-x0, int(self.alive), self.ammo, aim])
+        return np.array([self.x-x0, self.y-y0, int(self.alive), self.ammo, aim])
     
     @staticmethod
     def from_array(id, team, arr):
