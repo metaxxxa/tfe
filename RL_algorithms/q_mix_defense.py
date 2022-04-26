@@ -424,18 +424,18 @@ class Runner:
                 
 
         loss = error**2
-        mean_loss = torch.mean(loss)
         loss = loss.sum()
-        self.blue_team_buffers.loss_buffer.append(mean_loss.item())  # detach ?????????????????
-        if self.args.TENSORBOARD:
-            self.writer.add_scalar("Loss", mean_loss.item(), step)
         
-
 
         # gradient descent
         self.online_net.optimizer.zero_grad()
         loss.backward()
         self.online_net.optimizer.step()
+
+        self.blue_team_buffers.loss_buffer.append(loss.item()/self.args.BATCH_SIZE)
+        if self.args.TENSORBOARD:
+            self.writer.add_scalar("Loss", loss.item()/self.args.BATCH_SIZE, step)
+        
 
     def run(self):
         
