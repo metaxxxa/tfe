@@ -81,9 +81,9 @@ class QMIXArgs:
         self.GAMMA = 0.95
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 50000
+        self.EPSILON_DECAY = 100000
         self.SYNC_TARGET_FRAMES = 200
-        self.STOP_TRAINING = self.EPSILON_DECAY*2
+        self.STOP_TRAINING = self.EPSILON_DECAY*5
         self.USE_PER = False
         self.EPSILON_PER = 0.01
         self.ALPHA_PER = 0.6
