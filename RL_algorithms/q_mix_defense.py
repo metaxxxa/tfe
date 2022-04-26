@@ -66,13 +66,12 @@ class QMixer(nn.Module):
             nn.ReLU(),
             nn.Linear(self.args.mixer_hidden_dim, self.args.mixer_hidden_dim2, device=device)
         )
-        agent_params = list()
+        self.net_params = list(self.parameters())
         if self.args.COMMON_AGENTS_NETWORK:
-            self.net_params = list(self.agents_net.gru.parameters()) + list(self.agents_net.mlp1.parameters()) + list(self.agents_net.mlp2.parameters()) + list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters())  +list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
+            self.net_params += list(self.agents_net.parameters())
         else:
-            for agent_net in self.agents_nets.values():
-                agent_params += list(agent_net.gru.parameters()) + list(agent_net.mlp1.parameters()) + list(agent_net.mlp2.parameters())
-            self.net_params = agent_params + list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters())  +list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
+            for agent in args.blue_agent:
+                self.net_params += list(self.agents_nets[agent].parameters())
 
     def get_agent_nets(self, agent):
         if self.args.COMMON_AGENTS_NETWORK:
@@ -199,6 +198,7 @@ class Runner:
                 self.blue_team_buffers.episode_reward += reward
                 self.transition[agent] = [self.blue_team_buffers.observation[agent], self.blue_team_buffers.action[agent],reward,done,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
                 self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
+                self.blue_team_buffers.hidden_state[agent] = self.blue_team_buffers.hidden_state_next[agent]
     
     def store_transition(self, intitialisation=False): #not adapted for multiple agents
         if self.args.USE_PER:
@@ -227,7 +227,7 @@ class Runner:
     def update_priorities(self, error):
         for i, index in enumerate(self.index):
             self.blue_team_buffers.priority[index] = (self.args.EPSILON_PER + error[i].item())**self.args.ALPHA_PER
-            nb = (self.args.EPSILON_PER + error[i].item())**self.args.ALPHA_PER
+            self.blue_team_buffers.weights[index] = (self.args.BUFFER_SIZE*(self.blue_team_buffers.priority[index]/sum(self.blue_team_buffers.priority)))**-self.args.B_PER
          
         
     def step_buffer(self):

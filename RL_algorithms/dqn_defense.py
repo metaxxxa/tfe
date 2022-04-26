@@ -116,6 +116,17 @@ class Runner:
             self.load_model(self.args.ADVERSARY_MODEL, True)
 
         #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
+    
+    def observe(self, agent):
+        
+        if self.args.CONVOLUTIONAL_INPUT:
+            
+            return
+
+        else:
+            return self.env.observe(agent)
+
+    
     def random_action(self, agent, obs):
         if all(element == 0 for element in obs['action_mask']):
             return None
@@ -177,7 +188,8 @@ class Runner:
     def update_priorities(self, error):
         for i, index in enumerate(self.index):
             self.blue_team_buffers.priority[index] = (self.args.EPSILON_PER + error[i].item())**self.args.ALPHA_PER
-            nb = (self.args.EPSILON_PER + error[i].item())**self.args.ALPHA_PER
+            self.blue_team_buffers.weights[index] = (self.args.BUFFER_SIZE*(self.blue_team_buffers.priority[index]/sum(self.blue_team_buffers.priority)))**-self.args.B_PER
+         
             
         
 
@@ -395,13 +407,17 @@ class Runner:
                 rews = np.asarray([ t[agent][2] for t in transitions])
                 dones = np.asarray([t[agent][3] for t in transitions])
                 #new_obses = np.asarray([t[agent][4]['obs'] for t in transitions])
-                max_target_q_values = np.asarray([self.target_nets[agent].get_Q_max(torch.masked_select(self.target_nets[agent].get_Q_values(t[agent][4]), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.target_nets[agent].get_Q_values(t[agent][4]))[1].detach().item() for t in transitions])
-
                 obses_t = torch.as_tensor(obses, dtype=torch.float32,device=device)
                 actions_t = torch.as_tensor(actions, dtype=torch.int64,device=device).unsqueeze(-1)
                 rews_t = torch.as_tensor(rews, dtype=torch.float32,device=device)
                 dones_t = torch.as_tensor(dones, dtype=torch.float32,device=device)
                 #new_obses_t = torch.as_tensor(new_obses, dtype=torch.float32)
+                
+                if self.args.DOUBLE_DQN:
+                    max_target_q_values = np.asarray([self.target_nets[agent](t[agent][4]['obs'])[self.online_nets[agent].get_Q_max(torch.masked_select(self.online_nets[agent].get_Q_values(t[agent][4]), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.online_nets[agent].get_Q_values(t[agent][4]))[0]].item() for t in transitions])
+                else:
+                    max_target_q_values = np.asarray([self.target_nets[agent].get_Q_max(torch.masked_select(self.target_nets[agent].get_Q_values(t[agent][4]), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.target_nets[agent].get_Q_values(t[agent][4]))[1].detach().item() for t in transitions])
+
                 max_target_q_values_t = torch.as_tensor(max_target_q_values, dtype=torch.float32,device=device)
                 # targets
                 
