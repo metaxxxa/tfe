@@ -28,11 +28,12 @@ def transform_episode(episode):
     """
     new_episode = []
     agents = list(episode.keys())
-    n_steps = len(episode[agents[0]])
-    for i in range(n_steps):
+    n_steps = {agent: len(episode[agent]) for agent in episode}
+    for i in range(max(n_steps.values())):
         temp = {}
         for agent in agents:
-            temp[agent] = episode[agent][i]
+            if i < n_steps[agent]: # some agents terminate faster than others
+                temp[agent] = episode[agent][i]
         new_episode.append(temp)
     return new_episode
 

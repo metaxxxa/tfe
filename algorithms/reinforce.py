@@ -82,10 +82,10 @@ class Runner:
     * eval: evaluates current policies
     * log: logs results to tensorboard
     """
-    def __init__(self, terrain='flat_10x10', lr=0.05) -> None:
+    def __init__(self, terrain='flat_10x10', lr=0.05, gamma=0.99) -> None:
         self.env = defense_v0.env(terrain=terrain, max_cycles=30, max_distance=4)
         self.env.reset()
-        self.gamma = 0.99
+        self.gamma = gamma
 
         nets = {}
         for team in ['blue', 'red']:
@@ -138,7 +138,7 @@ class Runner:
             avg_loss, std_loss = np.mean(losses[agent]), np.std(losses[agent])
             if indx % PRINT_PERIOD == 0:
                 print(f"{indx} - {agent:11s}: loss = {avg_loss:5.4f}, reward = {results[agent]['reward']:5.4f}, length = {results[agent]['length']:3.2f}")
-            if indx > 0 and indx % 100 == 0:
+            if indx > 0 and indx % 1000 == 0:
                 self.generate_episode(render=True)
             self.writers[agent].add_scalar('loss', avg_loss, indx)
             self.writers[agent].add_scalar('reward', results[agent]['reward'], indx)
@@ -186,13 +186,16 @@ class Runner:
         return rtgs
 
 
-def train():
-    runner = Runner(terrain='flat_5x5', lr=0.00005)
+def train(lr, n_iters, gamma):
+    runner = Runner(terrain='flat_5x5', lr=lr, gamma=gamma)
     print(runner)
-    runner.run(n_iters=2000)
+    runner.run(n_iters=n_iters)
     while True:
         runner.generate_episode(render=True)
 
 
 if __name__ == '__main__':
-    train()
+    lr = float(sys.argv[1]) if len(sys.argv) > 1 else 0.0001
+    n_iters = int(sys.argv[2]) if len(sys.argv) > 2 else 20000
+    gamma = float(sys.argv[3]) if len(sys.argv) > 3 else 0.99
+    train(r=lr, n_iters=n_iters, gamma=gamma)
