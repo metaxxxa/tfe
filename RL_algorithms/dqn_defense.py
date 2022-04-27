@@ -32,7 +32,8 @@ from Utils.params import DQNArgs as Args
 device = get_device() #get cuda if available
 #environment constants
 constants = Constants()
-TERRAIN = 'benchmark_10x10_1v1'
+TERRAIN = 'benchmark_10x10_1v1_sym'
+TERRAIN_SIZE = 10
 MODEL_DIR = 'defense_params_dqn'
 RUN_NAME = 'benchmarking'
 ADVERSARY_TACTIC = 'random'
@@ -41,14 +42,26 @@ ADVERSARY_TACTIC = 'random'
 class DQN(nn.Module):
     def __init__(self, env, args, observation_space_shape, action_space_n):
         super().__init__()
-        
-        self.net = nn.Sequential(
-            nn.Linear(np.prod(observation_space_shape) , args.hidden_layer1_dim),
-            nn.ReLU(),
-            nn.Linear(args.hidden_layer1_dim,args.hidden_layer2_dim),
-            nn.ReLU(),
-            nn.Linear(args.hidden_layer2_dim, action_space_n)
-        ).to(device)
+        if args.CONVOLUTIONAL_INPUT:
+            self.net = nn.Sequential(
+                nn.Conv2d(in_channels=3, out_channels=args.CONV_OUT_CHANNELS, kernel_size=(args.KERNEL_SIZE, args.KERNEL_SIZE), padding=args.PADDING),
+                nn.ReLU(),
+                nn.Flatten(),
+                nn.Linear(args.CONV_OUT_CHANNELS*(TERRAIN_SIZE**2) , args.hidden_layer1_dim),
+                nn.ReLU(),
+                nn.Linear(args.hidden_layer1_dim,args.hidden_layer2_dim),
+                nn.ReLU(),
+                nn.Linear(args.hidden_layer2_dim, action_space_n)
+            ).to(device)
+
+        else:
+            self.net = nn.Sequential(
+                nn.Linear(np.prod(observation_space_shape) , args.hidden_layer1_dim),
+                nn.ReLU(),
+                nn.Linear(args.hidden_layer1_dim,args.hidden_layer2_dim),
+                nn.ReLU(),
+                nn.Linear(args.hidden_layer2_dim, action_space_n)
+            ).to(device)
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr = args.LEARNING_RATE)
         
     def forward(self, obs):
@@ -85,6 +98,7 @@ class Runner:
     def __init__(self, env, args):
         self.args = args
         self.env = env
+        self.env_size = 10  #try to get from environment
         self.blue_team_buffers = Buffers(self.env, self.args, self.args.blue_agents, device)
         self.opposing_team_buffers = Buffers(self.env, self.args, self.args.red_agents, device)
         self.online_nets = {}
@@ -102,7 +116,10 @@ class Runner:
             self.writer = SummaryWriter()
             args.log_params(TERRAIN, self.writer)
                 #display model graphs in tensorboard
-            self.writer.add_graph(self.online_nets[self.args.blue_agents[0]],torch.empty((self.args.observations_dim),device=device) )
+            if self.args.CONVOLUTIONAL_INPUT:
+                pass #to implement if time
+            else:
+                self.writer.add_graph(self.online_nets[self.args.blue_agents[0]],torch.empty((self.args.observations_dim),device=device) )
         
         self.sync_networks()
         
@@ -118,15 +135,31 @@ class Runner:
         #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
     
     def observe(self, agent):
+        observation = copy.deepcopy(self.env.observe(agent))
         
         if self.args.CONVOLUTIONAL_INPUT:
-            
-            return
-
-        else:
-            return self.env.observe(agent)
-
+            obs = np.array(observation['obs'], dtype='int')
+            terrain = np.zeros([3, self.env_size, self.env_size])
+            terrain[2, obs[0], obs[1]] = obs[3]*(1+(obs[4]>-1)) #getting coordinates of agent and setting number of ammo multiplied by 2 if aiming
+            terrain[1, obs[0], obs[1]] = 2*obs[2] # 2 if agent is alive
+            for i in range(1, int(self.env.max_num_agents/2)): #adding the teammates of the agent
+                terrain[1, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+2]*1 # 1 if teammate alive
+                terrain[2, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+3]*(1+(obs[5*i+4]>-1)) # ammo*2 if agent is aiming
+            for i in range(int(self.env.max_num_agents/2), int(self.env.max_num_agents)): #adding agents of other team, coordinates inverted ?
+                terrain[1, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = -obs[5*i+2]*1
+                terrain[2, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = -obs[5*i+3]*(1+(obs[5*i+4]>-1))
+            for i in range(0, int((len(obs)-self.env.max_num_agents*5)/2)):
+                terrain[0, obs[self.env.max_num_agents*5+1+i], obs[self.env.max_num_agents*5+2+i]] = 1
+            observation['obs'] = terrain
+        return observation
     
+    def last(self):
+        observation, reward, done, info = self.env.last()
+        if self.args.CONVOLUTIONAL_INPUT:
+            return self.observe(self.env.agent_selection), reward, done, info
+        else:
+            return observation, reward, done, info
+
     def random_action(self, agent, obs):
         if all(element == 0 for element in obs['action_mask']):
             return None
@@ -142,8 +175,7 @@ class Runner:
                 else:
                     reward = self.env._cumulative_rewards[agent]
                     done = self.env.dones[agent]
-                
-                self.opposing_team_buffers.observation_next[agent] = self.env.observe(agent)
+                self.opposing_team_buffers.observation_next[agent] = self.observe(agent)
                 self.opposing_team_buffers.episode_reward += reward
                 #store transition ?
                 self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
@@ -155,7 +187,7 @@ class Runner:
                 else:
                     reward = self.env._cumulative_rewards[agent]
                     done = self.env.dones[agent]
-                self.blue_team_buffers.observation_next[agent] = self.env.observe(agent)
+                self.blue_team_buffers.observation_next[agent] = self.observe(agent)
                 self.blue_team_buffers.episode_reward += reward
                 self.transition[agent] = [self.blue_team_buffers.observation[agent], self.blue_team_buffers.action[agent],reward,done,self.blue_team_buffers.observation_next[agent]]
                 self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
@@ -197,10 +229,10 @@ class Runner:
         self.blue_team_buffers.nb_transitions += 1
     def reset_buffer(self, agent):
         if self.is_opposing_team(agent):
-            self.opposing_team_buffers.observation[agent] = self.env.observe(agent)
+            self.opposing_team_buffers.observation[agent] = self.observe(agent)
             
         else:
-            self.blue_team_buffers.observation[agent] = self.env.observe(agent)
+            self.blue_team_buffers.observation[agent] = self.observe(agent)
 
     def reset_buffers(self):
             self.opposing_team_buffers.episode_reward = 0
@@ -313,16 +345,15 @@ class Runner:
             self.transition = dict() #to store the transition 
             self.step_buffer() #count the number of transitions per episode
             for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
-                
                 if self.is_opposing_team(agent):
-                    self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
+                    self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
                     if done:
                         action = None
                     self.opposing_team_buffers.action[agent] = action
                     
                 else:
-                    self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
+                    self.blue_team_buffers.observation[agent], _, done, _ = self.last()
                     action = self.random_action(agent, self.blue_team_buffers.observation[agent])
                     if done:
                         action = None
@@ -362,13 +393,13 @@ class Runner:
             for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
                 
                 if self.is_opposing_team(agent):
-                    self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
+                    self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
                     if done:
                         action = None
                     self.opposing_team_buffers.action[agent] = action
                 else:
-                    self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
+                    self.blue_team_buffers.observation[agent], _, done, _ = self.last()
                     action = self.online_nets[agent].act(self.blue_team_buffers.observation[agent])
                     if rnd_sample <= epsilon and self.args.GREEDY:
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
@@ -448,7 +479,7 @@ class Runner:
                 loss_sum += loss.detach().item()
 
 
-            loss_sum = loss_sum/self.args.n_blue_agents
+            loss_sum = loss_sum/(self.args.n_blue_agents*self.args.BATCH_SIZE)
             self.blue_team_buffers.loss_buffer.append(loss_sum)  # detach ?????????????????
             if self.args.TENSORBOARD:
                 self.writer.add_scalar("Loss /agent", loss_sum, step)
@@ -490,11 +521,11 @@ class Runner:
                 self.step_buffer()
                 for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
                     if self.is_opposing_team(agent):
-                        self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
+                        self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
                         action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
                         
                     else:
-                        self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
+                        self.blue_team_buffers.observation[agent], _, done, _ = self.last()
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
                     if done:
                         self.env.step(None)
@@ -531,11 +562,11 @@ class Runner:
                 self.step_buffer()
                 for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
                     if self.is_opposing_team(agent):
-                        self.opposing_team_buffers.observation[agent], _, done, _ = self.env.last()
+                        self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
                         action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
                         
                     else:
-                        self.blue_team_buffers.observation[agent], _, done, _ = self.env.last()
+                        self.blue_team_buffers.observation[agent], _, done, _ = self.last()
                         action = self.online_nets[agent].act(self.blue_team_buffers.observation[agent])
                     if done:
                         action = None

@@ -23,6 +23,9 @@ class DQNArgs:
         self.B_PER = 0.4
         self.DOUBLE_DQN = False
         self.CONVOLUTIONAL_INPUT = True
+        self.CONV_OUT_CHANNELS = 16
+        self.KERNEL_SIZE = 3
+        self.PADDING = 1
         #visualization parameters
         self.PRINT_LOGS = False
         self.VISUALIZE_WHEN_LEARNED = True
