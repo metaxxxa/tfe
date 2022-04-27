@@ -38,6 +38,8 @@ def generate_random(size, nb_agents, obstacles_random_factor):
     terrain = {'size': size, 'obstacles': obstacles, 'blue': blue_coord, 'red':red_coord}
     return terrain
 
+
+
 rand = generate_random(8,1, 0.125)
 print(rand)
 

@@ -78,7 +78,8 @@ class DQN(nn.Module):
         max_q_index = torch.argmax(q_values, dim=-1).detach().item()
         max_q = q_values[max_q_index]
         if all_q_values != None:
-            max_q_index = ((all_q_values == max_q.item()).cpu() * (obs['action_mask'] == 1)).nonzero(as_tuple=True)[1][0].item()
+            indexes = ((all_q_values == max_q.item()).cpu() * (obs['action_mask'] == 1)).nonzero(as_tuple=True)
+            max_q_index = indexes[0][-1].item()
         return max_q_index, max_q
 
 
@@ -445,7 +446,7 @@ class Runner:
                 #new_obses_t = torch.as_tensor(new_obses, dtype=torch.float32)
                 
                 if self.args.DOUBLE_DQN:
-                    max_target_q_values = np.asarray([self.target_nets[agent](t[agent][4]['obs'])[self.online_nets[agent].get_Q_max(torch.masked_select(self.online_nets[agent].get_Q_values(t[agent][4]), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.online_nets[agent].get_Q_values(t[agent][4]))[0]].item() for t in transitions])
+                    max_target_q_values = np.asarray([self.target_nets[agent].get_Q_values(t[agent][4])[0][self.online_nets[agent].get_Q_max(torch.masked_select(self.online_nets[agent].get_Q_values(t[agent][4]), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.online_nets[agent].get_Q_values(t[agent][4]))[0]].item() for t in transitions])
                 else:
                     max_target_q_values = np.asarray([self.target_nets[agent].get_Q_max(torch.masked_select(self.target_nets[agent].get_Q_values(t[agent][4]), torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=device)),t[agent][4],  self.target_nets[agent].get_Q_values(t[agent][4]))[1].detach().item() for t in transitions])
 
