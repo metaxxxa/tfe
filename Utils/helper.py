@@ -9,6 +9,16 @@ import os, sys
 from PIL import Image, ImageDraw
 from skimage.metrics import structural_similarity as ssim
 
+
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+os.chdir(BASE_DIR)
+sys.path.insert(0, BASE_DIR)
+from env import defense_v0
+from env import utilities
+
+
 class Constants:
     def __init__(self):
         self.EPISODE_MAX_LENGTH = 200
@@ -64,8 +74,11 @@ def mask_array(array, mask):
     return np.ma.compressed(np.ma.masked_where(mask==0, array) )
 
 def similarity_index(ter1, ter2, lines, window):
-    img1 = build_terrain(utilities.load_terrain(ter1), lines)[1]
-    img2 = build_terrain(utilities.load_terrain(ter2), lines)[1]
+    if type(ter1) == str:
+        ter1 = utilities.load_terrain(ter1)
+        ter2 = utilities.load_terrain(ter2)
+    img1 = build_terrain(ter1, lines)[1]
+    img2 = build_terrain(ter2, lines)[1]
 
     return ssim(img1, img2, win_size=window, )
 
@@ -91,22 +104,20 @@ def build_terrain(terrain, lines=False):
         ter[x,y,0], ter[x,y,1], ter[x,y,2] = 255, 0, 0
     
     image = Image.fromarray(ter, mode='RGB')
+    return image, np.array(image)
 
+def show_terrain(terrain_name, lines=False):
+    terrain = utilities.load_terrain(terrain_name)
+    image = build_terrain(terrain, lines)[0]
     image.show()
 
-    return image, np.array(image)
+
+
 
 
 if __name__ == "__main__":
         
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    os.chdir(BASE_DIR)
-    sys.path.insert(0, BASE_DIR)
-    from env import defense_v0
-
     
-    from env import utilities
 
 
 

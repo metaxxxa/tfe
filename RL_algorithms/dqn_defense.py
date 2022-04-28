@@ -32,7 +32,7 @@ from Utils.params import DQNArgs as Args
 device = get_device() #get cuda if available
 #environment constants
 constants = Constants()
-TERRAIN = 'benchmark_10x10_1v1_sym'
+TERRAIN = 'benchmark_10x10_1v1'
 TERRAIN_SIZE = 10
 MODEL_DIR = 'defense_params_dqn'
 RUN_NAME = 'benchmarking'
@@ -537,9 +537,7 @@ class Runner:
                         self.env.step(action)
                         
                         time.sleep(self.args.WAIT_BETWEEN_STEPS)
-
-                    self.update_buffer(agent, action)
-
+                #self.update_buffer()
                 if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
             
                     self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
@@ -551,7 +549,7 @@ class Runner:
                         self.env.render()
                     if log:
                         print(f'Episode reward /agent: {self.blue_team_buffers.episode_reward}')
-                    self.reset_buffers()
+                    #self.reset_buffers()
                     ep_counter += 1
         else:
             self.load_model(params_directory)
@@ -577,7 +575,7 @@ class Runner:
                         self.env.render()
                         time.sleep(self.args.WAIT_BETWEEN_STEPS)
 
-                    self.update_buffer(agent, action)
+                #self.update_buffer()
 
                 if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
             
@@ -590,7 +588,7 @@ class Runner:
                         self.env.render()
                     if log:
                         print(f'Episode reward /agent: {self.blue_team_buffers.episode_reward}')
-                    self.reset_buffers()
+                    #self.reset_buffers()
                     ep_counter += 1
 
         return results

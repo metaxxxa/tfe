@@ -21,8 +21,8 @@ class DQNArgs:
         self.EPSILON_PER = 0.0001
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
-        self.DOUBLE_DQN = False
-        self.CONVOLUTIONAL_INPUT = True
+        self.DOUBLE_DQN = True
+        self.CONVOLUTIONAL_INPUT = False
         self.CONV_OUT_CHANNELS = 16
         self.KERNEL_SIZE = 3
         self.PADDING = 1
