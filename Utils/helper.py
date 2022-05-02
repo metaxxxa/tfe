@@ -112,7 +112,37 @@ def show_terrain(terrain_name, lines=False):
     image.show()
 
 
+def obs_to_convInput(observation, env_size, max_num_agents):
+    obs = np.array(observation['obs'], dtype='int')
+    # 0 : obstacles
+    # 1 : observing agent
+    # 2 : teammates
+    # 3 : adversaries
+    # 4 : ammo teammates
+    # 5 : ammo adversaries
+    # 6 : aiming teammates
+    # 7 : aiming adversaries
+    terrain = np.zeros([8, env_size, env_size]) #initiating terrain
+    for i in range(0, int((len(obs)-max_num_agents*5)/2)):  #placing obstacles 
+        terrain[0, obs[max_num_agents*5+1+i], obs[max_num_agents*5+2+i]] = 1
+    
+    terrain[1, obs[0], obs[1]] = obs[2]*1  #placing observing agent
+    terrain[4, obs[0], obs[1]] = obs[3] 
+    terrain[6, obs[0], obs[1]] = obs[4]
 
+    for i in range(1, int(max_num_agents/2)): #adding the teammates of the agent
+        terrain[2, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+2]*1 # 1 if agent alive
+        terrain[4, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+3] 
+        terrain[6, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+4]
+
+    
+    for i in range(int(max_num_agents/2), int(max_num_agents)): #adding agents of other team
+        terrain[3, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+2]*1 # 1 if agent alive
+        terrain[5, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+3] 
+        terrain[7, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+4]
+    
+    
+    return terrain
 
 
 if __name__ == "__main__":

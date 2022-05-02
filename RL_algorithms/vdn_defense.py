@@ -25,7 +25,7 @@ from env import defense_v0
 
     
 from Utils.helper import Buffers, Params, Metrics, Constants, mask_array, get_device
-from Utils.params import QMIXArgs as Args
+from Utils.params import VDNArgs as Args
 
 device = get_device()
 
@@ -33,11 +33,11 @@ device = get_device()
 constants = Constants()
 TERRAIN = 'benchmark_10x10_1v1'
 
-MODEL_DIR = 'defense_params_qmix'
+MODEL_DIR = 'defense_params_vdn'
 RUN_NAME = 'benchmarking'
 ADVERSARY_TACTIC = 'random'
 
-class QMixer(nn.Module):
+class Mixer(nn.Module):
     def __init__(self, env, args):
         super().__init__()
         self.to(device)
@@ -57,16 +57,8 @@ class QMixer(nn.Module):
                 total_state_dim += np.prod(env.observation_space(agent).shape)
 
 
-        self.weightsL1_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim*self.args.n_blue_agents, device=device)
-        self.biasesL1_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim, device=device)
-        
-        self.weightsL2_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim2*self.args.mixer_hidden_dim, device=device)
-        self.biasesL2_net = nn.Sequential(
-            nn.Linear(total_state_dim, self.args.mixer_hidden_dim, device=device),
-            nn.ReLU(),
-            nn.Linear(self.args.mixer_hidden_dim, self.args.mixer_hidden_dim2, device=device)
-        )
-        self.net_params = list(self.parameters())
+       
+        self.net_params = list()
         if self.args.COMMON_AGENTS_NETWORK:
             self.net_params += list(self.agents_net.parameters())
         else:
@@ -81,19 +73,10 @@ class QMixer(nn.Module):
             return self.agent_nets[agent]
     
         
-    def forward(self, obs_tot,Qin_t):
-        weightsL1 = torch.abs(self.weightsL1_net(obs_tot)) # abs: monotonicity constraint
-        weightsL1_tensor = weightsL1.unsqueeze(-1).reshape([self.args.BATCH_SIZE, self.args.mixer_hidden_dim, self.args.n_blue_agents])
-        biasesL1 = self.biasesL1_net(obs_tot)
-        weightsL2 = torch.abs(self.weightsL2_net(obs_tot))
-        weightsL2_tensor = weightsL2.unsqueeze(-1).reshape([self.args.BATCH_SIZE, self.args.mixer_hidden_dim2, self.args.mixer_hidden_dim])
-        biasesL2 = self.biasesL2_net(obs_tot)
-        l1 = torch.matmul(weightsL1_tensor, Qin_t.unsqueeze(-1)).squeeze(-1) + biasesL1
-        l1 = nn.ELU(l1).alpha
-        Qtot = torch.matmul(weightsL2_tensor, l1.unsqueeze(-1)).squeeze(-1) + biasesL2
-        Qtot = Qtot.sum(1)
+    def forward(self, Qin_t):
         
-        return Qtot
+        
+        return Qin_t.sum(1)
         
     def get_Q_values(self, agent, obs,hidden_state):
         obs_t = torch.as_tensor(obs['obs'], dtype=torch.float32,device=device)
@@ -112,13 +95,13 @@ class QMixer(nn.Module):
 
     def act(self, agent, obs, hidden_state):
         with torch.no_grad():
-            q_values, hidden_state = self.get_Q_values(agent, obs, hidden_state)
+            q_values, hidden_state_next = self.get_Q_values(agent, obs, hidden_state)
             #taking only masked q values to choose action to take
             masked_q_val = torch.masked_select(q_values, torch.as_tensor(obs['action_mask'], dtype=torch.bool,device=device))
             if masked_q_val.numel() == 0:
-                return None, hidden_state
+                return None, hidden_state_next
             action, _ = self.get_Q_max(masked_q_val, obs, q_values)
-            return action, hidden_state
+            return action, hidden_state_next
     
         
         
@@ -143,7 +126,7 @@ class Runner:
         self.env = env
         self.blue_team_buffers = Buffers(self.env, self.args, self.args.blue_agents, device)
         self.opposing_team_buffers = Buffers(self.env, self.args, self.args.opposing_agents, device)
-        self.online_net = QMixer(self.env, self.args)
+        self.online_net = Mixer(self.env, self.args)
         self.target_net = copy.deepcopy(self.online_net) 
 
         #display model graphs in tensorboard
@@ -152,18 +135,17 @@ class Runner:
             self.writer = SummaryWriter()
             from Utils.plotter import plot_nn
 
-            plot_nn(self.online_net.get_agent_nets(self.args.blue_agents[0]), 'QMIX Agent') #to visualize the neural network
+            plot_nn(self.online_net.get_agent_nets(self.args.blue_agents[0]), 'VDN Agent') #to visualize the neural network
             
-            plot_nn(self.online_net, 'QMIX Mixer')
-            args.log_params(self.writer, 'qmixlin', TERRAIN)
+            plot_nn(self.online_net, 'VDN Mixer')
+            args.log_params(self.writer, 'vdn', TERRAIN)
             self.writer.add_graph(self.online_net.get_agent_nets(self.args.blue_agents[0]),(torch.empty((self.args.observations_dim),device=device), torch.empty((1, self.args.dim_L2_agents_net),device=device)) )
-            self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
-, torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
+            self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
         self.sync_networks()
         
         
-        if self.args.ADVERSARY_TACTIC == 'qmix':
-            self.adversary_net =QMixer(self.env, self.args)
+        if self.args.ADVERSARY_TACTIC == 'vdn':
+            self.adversary_net = Mixer(self.env, self.args)
             self.load_model(self.args.ADVERSARY_MODEL, True)
 
         #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
@@ -295,7 +277,7 @@ class Runner:
             return self.random_action(agent, obs)
         elif   self.args.ADVERSARY_TACTIC == 'passive':
             return 0
-        elif self.args.ADVERSARY_TACTIC == 'qmix':
+        elif self.args.ADVERSARY_TACTIC == 'vdn':
             action, self.opposing_team_buffers.hidden_state[agent] = self.adversary_net.act(agent, obs, self.opposing_team_buffers.hidden_state[agent])
             return action
 
@@ -324,8 +306,8 @@ class Runner:
 
         if not os.path.exists(dirname):
             os.makedirs(dirname)
-        torch.save(self.online_net.state_dict(), dirname + '/' + '/qmix_net_params.pt')
-        torch.save(self.target_net.state_dict(), dirname + '/' + '/qmix_target_net_params.pt')
+        torch.save(self.online_net.state_dict(), dirname + '/' + '/vdn_net_params.pt')
+        torch.save(self.target_net.state_dict(), dirname + '/' + '/vdn_target_net_params.pt')
         if self.args.COMMON_AGENTS_NETWORK:
             torch.save(self.online_net.agents_net.state_dict(),  dirname + '/agents_net_params.pt')
         else:
@@ -336,8 +318,8 @@ class Runner:
 
     def load_model(self, dir, red=False):
 
-        mixer_model = dir + '/qmix_net_params.pt'
-        target_model = dir + '/qmix_target_net_params.pt'
+        mixer_model = dir + '/vdn_net_params.pt'
+        target_model = dir + '/vdn_target_net_params.pt'
         
         if red:
             self.adversary_net.load_state_dict(torch.load(mixer_model))
@@ -403,6 +385,9 @@ class Runner:
 
             transition_nb += 1
 
+        agent_nb = 0
+            for agent in self.args.blue_agents: 
+
         #compute reward for all agents
         rewards_t = rewards_t.mean(1)
         
@@ -410,13 +395,13 @@ class Runner:
         all_agents_done_t = dones_t.sum(1)
         all_agents_done_t = all_agents_done_t == dones_t.shape[1]
         # targets
-        Qtot_max_target = self.target_net.forward(next_obses_t, Q_ins_target_t).detach()
-        Qtot_online = self.online_net.forward(obses_t, Q_action_online_t)
+        Qtot_max_target = self.target_net.forward( Q_ins_target_t).detach()
+        Qtot_online = self.online_net.forward( Q_action_online_t)
         y_tot = rewards_t + self.args.GAMMA*(1 - 1*all_agents_done_t)*Qtot_max_target
 
     ########### busy
         # loss 
-        error = y_tot - Qtot_online
+        error = y_tot -Qtot_online
         
         if self.args.USE_PER:
             self.update_priorities(abs(error))
@@ -632,7 +617,7 @@ def main(argv):
             sys.exit()
         elif opt in ('-a', "--load_adversary"):
             args_runner.ADVERSARY_MODEL = arg
-            args_runner.ADVERSARY_TACTIC = 'qmix'
+            args_runner.ADVERSARY_TACTIC = 'vdn'
         elif opt in ("-l", "--load_model"):
             args_runner.MODEL_TO_LOAD = arg
             runner = Runner(env, args_runner)

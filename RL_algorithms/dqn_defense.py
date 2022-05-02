@@ -21,7 +21,7 @@ os.chdir(BASE_DIR)
 sys.path.insert(0, BASE_DIR)
 from env import defense_v0
 
-    
+from Utils import helper
 from Utils.helper import Buffers, Params, Metrics, Constants, mask_array, get_device
 from Utils.params import DQNArgs as Args
 
@@ -37,17 +37,26 @@ TERRAIN_SIZE = 10
 MODEL_DIR = 'defense_params_dqn'
 RUN_NAME = 'benchmarking'
 ADVERSARY_TACTIC = 'random'
-
+ENV_SIZE = 10 #todo : calculate for dqn class
 
 class DQN(nn.Module):
     def __init__(self, env, args, observation_space_shape, action_space_n):
         super().__init__()
         if args.CONVOLUTIONAL_INPUT:
+            outconv1 = int((ENV_SIZE - args.DILATION*(args.KERNEL_SIZE-1) + 2*args.PADDING - 1)/args.STRIDE + 1)
+            outmaxPool = int((outconv1 + 2*args.PADDING_POOL - args.DILATION*(args.KERNEL_SIZE_POOL - 1) -1)/args.STRIDE + 1) #see full formula on pytorch's documentation website
+            outconv2 = int((outmaxPool - args.DILATION2*(args.KERNEL_SIZE2-1) + 2*args.PADDING2 - 1)/args.STRIDE2 + 1)
+            outmaxPool2 = int((outconv2 + 2*args.PADDING_POOL2 - args.DILATION2*(args.KERNEL_SIZE_POOL2 - 1) -1)/args.STRIDE2 + 1) 
             self.net = nn.Sequential(
-                nn.Conv2d(in_channels=3, out_channels=args.CONV_OUT_CHANNELS, kernel_size=(args.KERNEL_SIZE, args.KERNEL_SIZE), padding=args.PADDING),
+                nn.Conv2d(in_channels=8, out_channels=args.CONV_OUT_CHANNELS, kernel_size=(args.KERNEL_SIZE, args.KERNEL_SIZE), padding=args.PADDING, stride = args.STRIDE, dilation = args.DILATION),
                 nn.ReLU(),
+                nn.MaxPool2d(args.KERNEL_SIZE_POOL, args.STRIDE, dilation=args.DILATION, padding=args.PADDING_POOL),
+                nn.Conv2d(in_channels=args.CONV_OUT_CHANNELS, out_channels=args.CONV_OUT_CHANNELS2, kernel_size=(args.KERNEL_SIZE2, args.KERNEL_SIZE2), padding=args.PADDING2, stride = args.STRIDE2, dilation = args.DILATION2),
+                nn.ReLU(),
+                nn.MaxPool2d(args.KERNEL_SIZE_POOL2, args.STRIDE2, dilation=args.DILATION2, padding=args.PADDING_POOL2),
+                
                 nn.Flatten(),
-                nn.Linear(args.CONV_OUT_CHANNELS*(TERRAIN_SIZE**2) , args.hidden_layer1_dim),
+                nn.Linear(args.CONV_OUT_CHANNELS2*outmaxPool2**2, args.hidden_layer1_dim),
                 nn.ReLU(),
                 nn.Linear(args.hidden_layer1_dim,args.hidden_layer2_dim),
                 nn.ReLU(),
@@ -79,7 +88,7 @@ class DQN(nn.Module):
         max_q = q_values[max_q_index]
         if all_q_values != None:
             indexes = ((all_q_values == max_q.item()).cpu() * (obs['action_mask'] == 1)).nonzero(as_tuple=True)
-            max_q_index = indexes[0][-1].item()
+            max_q_index = indexes[-1][-1].item()
         return max_q_index, max_q
 
 
@@ -139,19 +148,7 @@ class Runner:
         observation = copy.deepcopy(self.env.observe(agent))
         
         if self.args.CONVOLUTIONAL_INPUT:
-            obs = np.array(observation['obs'], dtype='int')
-            terrain = np.zeros([3, self.env_size, self.env_size])
-            terrain[2, obs[0], obs[1]] = obs[3]*(1+(obs[4]>-1)) #getting coordinates of agent and setting number of ammo multiplied by 2 if aiming
-            terrain[1, obs[0], obs[1]] = 2*obs[2] # 2 if agent is alive
-            for i in range(1, int(self.env.max_num_agents/2)): #adding the teammates of the agent
-                terrain[1, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+2]*1 # 1 if teammate alive
-                terrain[2, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+3]*(1+(obs[5*i+4]>-1)) # ammo*2 if agent is aiming
-            for i in range(int(self.env.max_num_agents/2), int(self.env.max_num_agents)): #adding agents of other team, coordinates inverted ?
-                terrain[1, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = -obs[5*i+2]*1
-                terrain[2, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = -obs[5*i+3]*(1+(obs[5*i+4]>-1))
-            for i in range(0, int((len(obs)-self.env.max_num_agents*5)/2)):
-                terrain[0, obs[self.env.max_num_agents*5+1+i], obs[self.env.max_num_agents*5+2+i]] = 1
-            observation['obs'] = terrain
+            observation['obs'] = helper.obs_to_convInput(observation, self.env_size, self.env.env.max_num_agents)
         return observation
     
     def last(self):
@@ -198,12 +195,12 @@ class Runner:
         if self.args.USE_PER:
             if intitialisation:
                 p = 1
-                
+                w = (self.args.BUFFER_SIZE*(p/self.args.MIN_BUFFER_LENGTH))**-self.args.B_PER
             else:
                 p = max(self.blue_team_buffers.priority)
-            
+                w = (self.args.BUFFER_SIZE*(p/sum(self.blue_team_buffers.priority)))**-self.args.B_PER
             self.blue_team_buffers.priority.append(p)
-            w = (self.args.BUFFER_SIZE*(p/sum(self.blue_team_buffers.priority)))**-self.args.B_PER
+            
             self.blue_team_buffers.weights.append(w)
         
         self.blue_team_buffers.replay_buffer.append(self.transition)
