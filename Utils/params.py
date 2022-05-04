@@ -90,7 +90,7 @@ class QMIXArgs:
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
-        self.LEARNING_RATE = 1e-4
+        self.LEARNING_RATE = 1e-5
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
         self.GAMMA = 0.85
@@ -98,7 +98,7 @@ class QMIXArgs:
         self.EPSILON_END = 0.01
         self.EPSILON_DECAY = 10000
         self.SYNC_TARGET_FRAMES = 2000
-        self.STOP_TRAINING = self.EPSILON_DECAY*10
+        self.STOP_TRAINING = self.EPSILON_DECAY*100
         self.USE_PER = False
         self.EPSILON_PER = 0.01
         self.ALPHA_PER = 0.6
@@ -177,7 +177,7 @@ class VDNArgs:
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
-        self.LEARNING_RATE = 1e-4
+        self.LEARNING_RATE = 1e-5
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
         self.GAMMA = 0.95
