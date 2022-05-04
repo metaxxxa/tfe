@@ -31,11 +31,13 @@ device = get_device()
 
 #environment constants
 constants = Constants()
-TERRAIN = 'benchmark_10x10_1v1'
+TERRAIN = 'benchmark_10x10_2v2'
 
 MODEL_DIR = 'defense_params_vdn'
 RUN_NAME = 'benchmarking'
 ADVERSARY_TACTIC = 'random'
+ENV_SIZE = 10 #todo : calculate 
+
 
 class Mixer(nn.Module):
     def __init__(self, env, args):
@@ -45,7 +47,7 @@ class Mixer(nn.Module):
         self.args = args
         total_state_dim = 0
         if self.args.COMMON_AGENTS_NETWORK:
-            self.agents_net = AgentRNN(self.args)
+            self.agents_net = AgentNet(self.args)
             for agent in self.args.blue_agents:
                 #self.agent_nets[agent] = self.agents_net
                 total_state_dim += np.prod(env.observation_space(agent).spaces['obs'].shape)               
@@ -53,7 +55,7 @@ class Mixer(nn.Module):
         else:
             for agent in args.blue_agents:
                 self.agents_nets = dict()
-                self.agents_nets[agent] = AgentRNN(args)
+                self.agents_nets[agent] = AgentNet(args)
                 total_state_dim += np.prod(env.observation_space(agent).shape)
 
 
@@ -106,18 +108,55 @@ class Mixer(nn.Module):
         
         
     
-class AgentRNN(nn.Module):
+class AgentNet(nn.Module):
     def __init__(self,args):
         super().__init__()
-        self.mlp1 = nn.Linear(args.nb_inputs_agent, args.dim_L1_agents_net, device=device)
-        self.gru = nn.GRUCell(args.dim_L1_agents_net,args.dim_L2_agents_net, device=device)
-        self.mlp2 = nn.Linear(args.dim_L2_agents_net, args.n_actions, device=device)
-        self.relu = nn.ReLU()
-    def forward(self,obs_t, hidden_state_t):
-        in_gru = self.relu(self.mlp1(obs_t))
-        hidden_next = self.gru(in_gru.unsqueeze(0), hidden_state_t)
-        q_values = self.mlp2(hidden_next)
-        return q_values, hidden_next
+        self.RNN = args.RNN
+        if self.RNN:
+            self.mlp1 = nn.Linear(args.nb_inputs_agent, args.dim_L1_agents_net, device=device)
+            self.gru = nn.GRUCell(args.dim_L1_agents_net,args.dim_L2_agents_net, device=device)
+            self.mlp2 = nn.Linear(args.dim_L2_agents_net, args.n_actions, device=device)
+            self.relu = nn.ReLU()
+        else:
+            if args.CONVOLUTIONAL_INPUT:
+                outconv1 = int((ENV_SIZE - args.DILATION*(args.KERNEL_SIZE-1) + 2*args.PADDING - 1)/args.STRIDE + 1)
+                outmaxPool = int((outconv1 + 2*args.PADDING_POOL - args.DILATION*(args.KERNEL_SIZE_POOL - 1) -1)/args.STRIDE + 1) #see full formula on pytorch's documentation website
+                outconv2 = int((outmaxPool - args.DILATION2*(args.KERNEL_SIZE2-1) + 2*args.PADDING2 - 1)/args.STRIDE2 + 1)
+                outmaxPool2 = int((outconv2 + 2*args.PADDING_POOL2 - args.DILATION2*(args.KERNEL_SIZE_POOL2 - 1) -1)/args.STRIDE2 + 1) 
+                self.net = nn.Sequential(
+                    nn.Conv2d(in_channels=8, out_channels=args.CONV_OUT_CHANNELS, kernel_size=(args.KERNEL_SIZE, args.KERNEL_SIZE), padding=args.PADDING, stride = args.STRIDE, dilation = args.DILATION),
+                    nn.ReLU(),
+                    nn.MaxPool2d(args.KERNEL_SIZE_POOL, args.STRIDE, dilation=args.DILATION, padding=args.PADDING_POOL),
+                    nn.Conv2d(in_channels=args.CONV_OUT_CHANNELS, out_channels=args.CONV_OUT_CHANNELS2, kernel_size=(args.KERNEL_SIZE2, args.KERNEL_SIZE2), padding=args.PADDING2, stride = args.STRIDE2, dilation = args.DILATION2),
+                    nn.ReLU(),
+                    nn.MaxPool2d(args.KERNEL_SIZE_POOL2, args.STRIDE2, dilation=args.DILATION2, padding=args.PADDING_POOL2),
+                    
+                    nn.Flatten(),
+                    nn.Linear(args.CONV_OUT_CHANNELS2*outmaxPool2**2, args.hidden_layer1_dim),
+                    nn.ReLU(),
+                    nn.Linear(args.hidden_layer1_dim,args.hidden_layer2_dim),
+                    nn.ReLU(),
+                    nn.Linear(args.hidden_layer2_dim, args.n_actions)
+                ).to(device)
+
+            else:
+                self.net = nn.Sequential(
+                    nn.Linear(args.observations_dim , args.hidden_layer1_dim),
+                    nn.ReLU(),
+                    nn.Linear(args.hidden_layer1_dim,args.hidden_layer2_dim),
+                    nn.ReLU(),
+                    nn.Linear(args.hidden_layer2_dim, args.n_actions)
+                ).to(device)
+
+    def forward(self, obs_t, hidden_state_t):
+        if self.RNN:
+            in_gru = self.relu(self.mlp1(obs_t))
+            hidden_next = self.gru(in_gru.unsqueeze(0), hidden_state_t)
+            q_values = self.mlp2(hidden_next)
+            return q_values, hidden_next
+        else:
+            return self.net(obs_t), None
+
 
 
 class Runner:
@@ -139,8 +178,8 @@ class Runner:
             
             plot_nn(self.online_net, 'VDN Mixer')
             args.log_params(self.writer, 'vdn', TERRAIN)
-            self.writer.add_graph(self.online_net.get_agent_nets(self.args.blue_agents[0]),(torch.empty((self.args.observations_dim),device=device), torch.empty((1, self.args.dim_L2_agents_net),device=device)) )
-            self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
+            #self.writer.add_graph(self.online_net.get_agent_nets(self.args.blue_agents[0]),(torch.empty((self.args.observations_dim),device=device), torch.empty((1, self.args.dim_L2_agents_net),device=device)) )
+            #self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
         self.sync_networks()
         
         
@@ -386,7 +425,6 @@ class Runner:
             transition_nb += 1
 
         agent_nb = 0
-            for agent in self.args.blue_agents: 
 
         #compute reward for all agents
         rewards_t = rewards_t.mean(1)

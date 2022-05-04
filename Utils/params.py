@@ -17,6 +17,7 @@ class DQNArgs:
         self.EPSILON_DECAY = 400000
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*2
+        self.RNN = False
         self.USE_PER = False
         self.EPSILON_PER = 0.0001
         self.ALPHA_PER = 0.6
@@ -96,12 +97,31 @@ class QMIXArgs:
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
         self.EPSILON_DECAY = 10000
-        self.SYNC_TARGET_FRAMES = 200
+        self.SYNC_TARGET_FRAMES = 2000
         self.STOP_TRAINING = self.EPSILON_DECAY*10
         self.USE_PER = False
         self.EPSILON_PER = 0.01
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
+        self.RNN = False
+        self.DOUBLE_DQN = False
+        self.CONVOLUTIONAL_INPUT = False
+        #convolutional parameters
+        self.CONV_OUT_CHANNELS = 16
+        self.KERNEL_SIZE = 1
+        self.KERNEL_SIZE_POOL = 1
+        self.PADDING = 0
+        self.STRIDE = 1
+        self.PADDING_POOL = 0
+        self.DILATION = 1
+        #second  convolutional layer
+        self.CONV_OUT_CHANNELS2 = 64
+        self.KERNEL_SIZE2 = 4
+        self.KERNEL_SIZE_POOL2 = 1
+        self.PADDING2 = 2
+        self.STRIDE2 = 1
+        self.PADDING_POOL2 = 0
+        self.DILATION2 = 1
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
         self.VISUALIZE_AFTER = 20000000
@@ -120,6 +140,8 @@ class QMIXArgs:
         self.COMMON_AGENTS_NETWORK = True
         self.dim_L1_agents_net = 32
         self.dim_L2_agents_net = 32
+        self.hidden_layer1_dim = 64
+        self.hidden_layer2_dim = 64
         #mixing network parameters
         self.mixer_hidden_dim = 32
         self.mixer_hidden_dim2 = 32
@@ -162,12 +184,31 @@ class VDNArgs:
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
         self.EPSILON_DECAY = 10000
-        self.SYNC_TARGET_FRAMES = 200
-        self.STOP_TRAINING = self.EPSILON_DECAY*5
+        self.SYNC_TARGET_FRAMES = 2000
+        self.STOP_TRAINING = self.EPSILON_DECAY*50
         self.USE_PER = False
         self.EPSILON_PER = 0.01
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
+        self.RNN = False
+        self.DOUBLE_DQN = False
+        self.CONVOLUTIONAL_INPUT = False
+        #convolutional parameters
+        self.CONV_OUT_CHANNELS = 16
+        self.KERNEL_SIZE = 1
+        self.KERNEL_SIZE_POOL = 1
+        self.PADDING = 0
+        self.STRIDE = 1
+        self.PADDING_POOL = 0
+        self.DILATION = 1
+        #second  convolutional layer
+        self.CONV_OUT_CHANNELS2 = 64
+        self.KERNEL_SIZE2 = 4
+        self.KERNEL_SIZE_POOL2 = 1
+        self.PADDING2 = 2
+        self.STRIDE2 = 1
+        self.PADDING_POOL2 = 0
+        self.DILATION2 = 1
         #visualization parameters
         self.VISUALIZE_WHEN_LEARNED = True
         self.VISUALIZE_AFTER = 20000000
@@ -186,6 +227,8 @@ class VDNArgs:
         self.COMMON_AGENTS_NETWORK = True
         self.dim_L1_agents_net = 32
         self.dim_L2_agents_net = 32
+        self.hidden_layer1_dim = 64
+        self.hidden_layer2_dim = 64
         #mixing network parameters
         self.mixer_hidden_dim = 32
         self.mixer_hidden_dim2 = 32
