@@ -62,7 +62,7 @@ class Mixer(nn.Module):
        
         self.net_params = list()
         if self.args.COMMON_AGENTS_NETWORK:
-            self.net_params += list(self.agents_net.parameters())
+            self.net_params += list(self.agents_net.net.parameters())
         else:
             for agent in args.blue_agent:
                 self.net_params += list(self.agents_nets[agent].parameters())
@@ -540,7 +540,7 @@ class Runner:
                 self.env.step(action)
                 
                 self.visualize()
-            self.update_buffer()
+            self.update_buffer() 
             self.complete_transition()
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
                 self.give_global_reward()

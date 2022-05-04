@@ -69,7 +69,7 @@ class QMixer(nn.Module):
         )
         self.net_params = list(self.parameters())
         if self.args.COMMON_AGENTS_NETWORK:
-            self.net_params += list(self.agents_net.parameters())
+            self.net_params += list(self.agents_net.net.parameters())
         else:
             for agent in args.blue_agent:
                 self.net_params += list(self.agents_nets[agent].parameters())

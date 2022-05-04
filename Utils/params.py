@@ -191,7 +191,7 @@ class VDNArgs:
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
         self.RNN = False
-        self.DOUBLE_DQN = False
+        self.DOUBLE_DQN = True
         self.CONVOLUTIONAL_INPUT = False
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
