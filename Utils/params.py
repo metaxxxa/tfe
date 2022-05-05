@@ -4,9 +4,12 @@ import re
 from datetime import datetime
 #parameters
 
+from Utils.helper import get_device
+
 class DQNArgs:
     def __init__(self, env):
-            
+        self.ALGO = 'dqn'
+        self.device = get_device()
         self.BUFFER_SIZE = 2000
         self.LEARNING_RATE = 1e-5
         self.MIN_BUFFER_LENGTH = 300
@@ -59,7 +62,10 @@ class DQNArgs:
         #agent network parameters
         self.hidden_layer1_dim = 64
         self.hidden_layer2_dim = 64
+        self.dim_L1_agents_net = 32
+        self.dim_L2_agents_net = 32
         #environment specific parameters calculation
+        self.ENV_SIZE = 10 #to calculate 
         self.WINNING_REWARD = 1
         self.LOSING_REWARD = -1
         self.TEAM_TO_TRAIN = 'blue'
@@ -77,6 +83,8 @@ class DQNArgs:
         agent = self.blue_agents[0]
         self.nb_inputs_agent = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
+        if self.CONVOLUTIONAL_INPUT:
+            self.observations_dim = 8*self.ENV_SIZE**2
         self.n_actions = env.action_space(agent).n
     def log_params(self, terrain, writer=None):
         hparams = {'envparam/terrrain': terrain,'Adversary tactic':self.ADVERSARY_TACTIC , 'Algorithm': 'DQN' , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '/gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0)))}
@@ -87,6 +95,8 @@ class DQNArgs:
 
 class QMIXArgs:
     def __init__(self, env):
+        self.ALGO = 'qmix'
+        self.device = get_device()
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
@@ -103,9 +113,9 @@ class QMIXArgs:
         self.EPSILON_PER = 0.01
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
-        self.RNN = False
+        self.RNN = True
         self.DOUBLE_DQN = False
-        self.CONVOLUTIONAL_INPUT = False
+        self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
         self.KERNEL_SIZE = 1
@@ -146,6 +156,7 @@ class QMIXArgs:
         self.mixer_hidden_dim = 32
         self.mixer_hidden_dim2 = 32
         #environment specific parameters calculation
+        self.ENV_SIZE = 10 #to calculate 
         self.WINNING_REWARD = 1
         self.LOSING_REWARD = -1
         self.TEAM_TO_TRAIN = 'blue'
@@ -163,6 +174,8 @@ class QMIXArgs:
         agent = self.blue_agents[0]
         self.nb_inputs_agent = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
+        if self.CONVOLUTIONAL_INPUT:
+            self.observations_dim = 8*self.ENV_SIZE**2
         self.n_actions = env.action_space(agent).n
     def log_params(self, writer, algorithm, terrain):
         hparams = {'envparam/terrrain': terrain, 'Adversary tactic' : self.ADVERSARY_TACTIC, 'Algorithm': algorithm , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '/gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0))), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
@@ -174,13 +187,15 @@ class QMIXArgs:
 
 class VDNArgs:
     def __init__(self, env):
+        self.ALGO = 'vdn'
+        self.device = get_device()
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
-        self.LEARNING_RATE = 1e-5
+        self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
-        self.GAMMA = 0.95
+        self.GAMMA = 0.9
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
         self.EPSILON_DECAY = 10000
@@ -233,6 +248,7 @@ class VDNArgs:
         self.mixer_hidden_dim = 32
         self.mixer_hidden_dim2 = 32
         #environment specific parameters calculation
+        self.ENV_SIZE = 10 #to calculate 
         self.WINNING_REWARD = 1
         self.LOSING_REWARD = -1
         self.TEAM_TO_TRAIN = 'blue'
@@ -250,6 +266,8 @@ class VDNArgs:
         agent = self.blue_agents[0]
         self.nb_inputs_agent = np.prod(env.observation_space(agent).spaces['obs'].shape)
         self.observations_dim = np.prod(env.observation_space(agent).spaces['obs'].shape)
+        if self.CONVOLUTIONAL_INPUT:
+            self.observations_dim = 8*self.ENV_SIZE**2
         self.n_actions = env.action_space(agent).n
     def log_params(self, writer, algorithm, terrain):
         hparams = {'envparam/terrrain': terrain, 'Adversary tactic' : self.ADVERSARY_TACTIC, 'Algorithm': algorithm , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '/gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0))), 'Common agent network': int(self.COMMON_AGENTS_NETWORK)}
