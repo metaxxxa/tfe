@@ -329,7 +329,7 @@ class Runner:
                 
 
         loss = error**2
-        loss = loss.sum()
+        loss = loss.sum() 
         
 
         # gradient descent
@@ -369,6 +369,8 @@ class Runner:
                             action = None
                         _, self.blue_team_buffers.hidden_state_next[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
                         self.blue_team_buffers.action[agent] = action
+                    if action == 5:
+                        print('wait')
                     self.env.step(action)
                     
                     self.visualize()

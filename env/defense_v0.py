@@ -11,7 +11,7 @@ Actions:    0 -> noop
 
 from itertools import product
 import functools
-
+import re
 import numpy as np
 from matplotlib import pyplot as plt
 plt.ion()
@@ -406,8 +406,9 @@ class Environment(AECEnv):
                     self.dones[agent] = True
                     self.infos[agent]['winner'] = 'other'
         else:
-            self._cumulative_rewards[self.agent_selection] += STEP
-
+            self._cumulative_rewards[self.agent_selection] += STEP 
+            
+       
         for agent in self.agents:
             # additional done criterium: if dead, agent is done
             if not self.agents_[agent].alive:
@@ -424,6 +425,15 @@ class Environment(AECEnv):
         if self._agent_selector.is_last():
             self.observations = {agent: self.observe_(agent).copy() for agent in self.agents}
             
+            #distributing rewards
+            
+            for agent_name, agent_object in self.agents_.items():
+                for agent_done, done_bool in self.dones.items():
+                    if done_bool:
+                        self._cumulative_rewards[agent_name] += 0.5 - ( re.match(rf'^{agent_object.team}', agent_done) != None)  # -0.5 if a teammate is killed and + 0.5 if an adversary is killed
+
+
+
             # check if max_cycles hasn't been exceeded; if so, set all agents to done
             self.steps += 1
             if self.steps >= self.max_cycles:
