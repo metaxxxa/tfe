@@ -60,6 +60,7 @@ class QMixer(nn.Module):
             nn.ReLU(),
             nn.Linear(self.args.mixer_hidden_dim, self.args.mixer_hidden_dim2, device=device)
         )
+        #self.net_params = list(self.weightsL1_net.parameters()) + list(self.biasesL1_net.parameters()) + list(self.weightsL2_net.parameters()) + list(self.biasesL2_net.parameters())
         self.net_params = list(self.parameters())
         if self.args.COMMON_AGENTS_NETWORK:
             if self.args.RNN:
