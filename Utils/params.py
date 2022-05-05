@@ -100,7 +100,7 @@ class QMIXArgs:
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
-        self.LEARNING_RATE = 1e-5
+        self.LEARNING_RATE = 1e-3
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
         self.GAMMA = 0.85
