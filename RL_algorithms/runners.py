@@ -149,9 +149,12 @@ class Runner:
         if all([agent in self.transition for agent in self.args.blue_agents]):
             return
         else:
+            reward = 0
+            if len(self.transition) != 0:
+                reward = list(self.transition.items())[0][-1][2]  #all agents have the same reward as the agents still in the game
             for agent in self.args.blue_agents:
                 if agent not in self.transition:  #done agents get 0 reward and keep same observation
-                    self.transition[agent] = [self.blue_team_buffers.observation[agent], -1, -0.01, True,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
+                    self.transition[agent] = [self.blue_team_buffers.observation[agent], -1, reward, True,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
     def winner_is_blue(self):
         first_agent_in_list = [*self.env.infos][0]
         if len(self.env.infos.keys()) == 1:
@@ -369,8 +372,6 @@ class Runner:
                             action = None
                         _, self.blue_team_buffers.hidden_state_next[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
                         self.blue_team_buffers.action[agent] = action
-                    if action == 5:
-                        print('wait')
                     self.env.step(action)
                     
                     self.visualize()
