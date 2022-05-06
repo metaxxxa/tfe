@@ -78,7 +78,7 @@ class VDNMixer(nn.Module):
         
     def get_Q_values(self, agent, obs,hidden_state):
         obs_t = torch.as_tensor(obs['obs'], dtype=torch.float32,device=device)
-        q_values, hidden_state_next = self.get_agent_nets(agent)(obs_t, hidden_state)
+        q_values, hidden_state_next = self.get_agent_nets(agent)(obs_t.unsqueeze(0), hidden_state)
         return q_values, hidden_state_next
 
     def get_Q_max(self, masked_q_values, obs, all_q_values=None):
