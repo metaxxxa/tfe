@@ -11,21 +11,21 @@ class DQNArgs:
         self.ALGO = 'dqn'
         self.device = get_device()
         self.BUFFER_SIZE = 2000
-        self.LEARNING_RATE = 1e-5
+        self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
-        self.GAMMA = 0.95
+        self.GAMMA = 0.9
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 400000
+        self.EPSILON_DECAY = 10000
         self.SYNC_TARGET_FRAMES = 200
-        self.STOP_TRAINING = self.EPSILON_DECAY*2
+        self.STOP_TRAINING = self.EPSILON_DECAY*5
         self.RNN = False
-        self.USE_PER = False
+        self.USE_PER = True
         self.EPSILON_PER = 0.0001
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
-        self.DOUBLE_DQN = True
+        self.DOUBLE_DQN = True 
         self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
@@ -100,7 +100,7 @@ class QMIXArgs:
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
-        self.LEARNING_RATE = 1e-3
+        self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
         self.GAMMA = 0.85
@@ -114,7 +114,7 @@ class QMIXArgs:
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
         self.RNN = True
-        self.DOUBLE_DQN = False
+        self.DOUBLE_DQN = True
         self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
@@ -205,9 +205,9 @@ class VDNArgs:
         self.EPSILON_PER = 0.01
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
-        self.RNN = False
+        self.RNN = True
         self.DOUBLE_DQN = True
-        self.CONVOLUTIONAL_INPUT = False
+        self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
         self.KERNEL_SIZE = 1

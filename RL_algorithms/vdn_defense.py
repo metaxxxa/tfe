@@ -62,19 +62,7 @@ class VDNMixer(nn.Module):
                 total_state_dim += np.prod(env.observation_space(agent).shape)
 
 
-       
-        self.net_params = list()
-        if self.args.COMMON_AGENTS_NETWORK:
-            if self.args.RNN:
-                self.net_params += list(self.agents_net.mlp1.parameters()) + list(self.agents_net.mlp2.parameters()) + list(self.agents_net.gru.parameters())
-                if self.args.CONVOLUTIONAL_INPUT:
-                    self.net_params += list(self.agents_net.conv_layer.parameters())
-            else:
-                self.net_params += list(self.agents_net.net.parameters())
-        else: #not up
-            for agent in args.blue_agent:
-                self.net_params += list(self.agents_nets[agent].parameters())
-        self.optimizer = torch.optim.Adam(self.net_params, lr = self.args.LEARNING_RATE)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr = self.args.LEARNING_RATE) #adding all parameters to optimizer at once
 
     def get_agent_nets(self, agent):
         if self.args.COMMON_AGENTS_NETWORK:

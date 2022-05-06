@@ -427,10 +427,10 @@ class Environment(AECEnv):
             
             #distributing rewards
             
-            for agent_name in self.agents:
-                for agent_done, done_bool in self.dones.items():
-                    if done_bool:
-                        self._cumulative_rewards[agent_name] += 0.5 - ( re.match(rf'^{self.agents_[agent_name].team}', agent_done) != None)  # -0.5 if a teammate is killed and + 0.5 if an adversary is killed
+           # for agent_name in self.agents:
+            #    for agent_done, done_bool in self.dones.items():
+             #       if done_bool:
+              #          self._cumulative_rewards[agent_name] += 0.5 - ( re.match(rf'^{self.agents_[agent_name].team}', agent_done) != None)  # -0.5 if a teammate is killed and + 0.5 if an adversary is killed
 
 
 

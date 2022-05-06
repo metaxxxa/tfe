@@ -294,7 +294,7 @@ class Runner:
                 masked_target_q = torch.masked_select(target_q_values, torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=self.args.device))
 
                 if self.args.DOUBLE_DQN:
-                    Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0][self.online_net.get_Q_max(torch.masked_select(self.online_net.get_Q_values(agent, t[agent][4], t[agent][6])[0], torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=self.args.device)),t[agent][4],  self.online_net.get_Q_values(agent, t[agent][4], t[agent][6])[0])[0]].detach()
+                    Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_values(agent, t[agent][4], t[agent][6])[0].squeeze(0)[self.online_net.get_Q_max(torch.masked_select(self.online_net.get_Q_values(agent, t[agent][4], t[agent][6])[0], torch.as_tensor(t[agent][4]['action_mask'], dtype=torch.bool,device=self.args.device)),t[agent][4],  self.online_net.get_Q_values(agent, t[agent][4], t[agent][6])[0])[0]].detach()
                     
                 else:
                     Q_ins_target_t[transition_nb][agent_nb] = self.target_net.get_Q_max(masked_target_q, t[agent][4], target_q_values)[1].detach()

@@ -61,6 +61,7 @@ class AgentNet(nn.Module):
                     nn.ReLU(),
                     nn.Linear(args.hidden_layer2_dim, args.n_actions)
                 ).to(args.device)
+            
 
     def forward(self, obs_t, hidden_state_t):
         if self.RNN:
@@ -74,3 +75,15 @@ class AgentNet(nn.Module):
             return q_values, hidden_next
         else:
             return self.net(obs_t), None
+
+if __name__ == '__main__':
+    class Args:
+        CONVOLUTIONAL_INPUT = False
+        RNN = False
+        observations_dim  = 3
+        hidden_layer1_dim = 5
+        hidden_layer2_dim = 7
+        n_actions = 11
+        device = 'cpu'
+
+    agentnet = AgentNet(Args)
