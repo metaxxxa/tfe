@@ -14,8 +14,10 @@ def generate_random(size, nb_agents, obstacles_random_factor):
     random_obstacles = np.transpose(np.where(np.random.rand(size, size) < obstacles_random_factor)) #placing obstacles randomly
     obstacles = [tuple(obstacle) for obstacle in random_obstacles]
 
-    blue_coord = [(np.random.randint(size), np.random.randint(size)) for _ in range(nb_agents)] #placing agents randomly
+    blue_coord = [(np.random.randint(size), np.random.randint(size)) for _ in range(nb_agents)] #placing agents randomly at different locations
     red_coord = [(np.random.randint(size), np.random.randint(size)) for _ in range(nb_agents)]
+    while red_coord ==  blue_coord:
+        red_coord = [(np.random.randint(size), np.random.randint(size)) for _ in range(nb_agents)]
     obstacles = [i for i in obstacles if (i not in blue_coord and i not in red_coord)] #removing obstacles from agents, positions
     while len(obstacles) != nb_obstacles:
         if len(obstacles)!=0:
@@ -26,7 +28,6 @@ def generate_random(size, nb_agents, obstacles_random_factor):
                 if ((coord not in blue_coord) and (coord not in red_coord)):
                     obstacles.append(coord) 
                     break 
-            
             
     terrain = {'size': size, 'obstacles': obstacles, 'blue': blue_coord, 'red':red_coord}
     return terrain
@@ -67,6 +68,6 @@ if __name__ == "__main__":
     for i in range(1,6):
         print(helper.similarity_index(base, f'test/sim{i}_', lines, window))
     
-    generate_library(10, 1, 'benchmark_10x10_1v1', 1000, 'testgenlib')
+    generate_library(10, 1, 'benchmark_10x10_1v1', 100, 'testgenlib')
   #  utilities.write_terrain('test', f'ondiff_ind={index}', t)
  #   helper.show_terrain(f'test/ondiff_ind={index}')

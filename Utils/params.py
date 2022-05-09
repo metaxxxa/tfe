@@ -198,7 +198,7 @@ class VDNArgs:
         self.GAMMA = 0.9
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 10000
+        self.EPSILON_DECAY = 200000
         self.SYNC_TARGET_FRAMES = 2000
         self.STOP_TRAINING = self.EPSILON_DECAY*50
         self.USE_PER = False

@@ -81,7 +81,7 @@ if __name__ == "__main__":
     algo = 'dqn'
     model_dir = 'defense_params_dqn/benchmarking/071732mai2022step_0'
     env_dir = 'testgenlib'
-    nb_ep = 1
+    nb_ep = 3
     adversary_type = 'random'
     #model_dir = 'random'
     out = test_model(algo, adversary_type,  model_dir, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'evalstestt1')
