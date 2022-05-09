@@ -67,17 +67,21 @@ def test_model(algorithm, adversary_tactic, model_directory, environments_direct
         
     return results
 
-algo = 'dqn'
-model_dir = 'defense_params_dqn/111943avril2022step_0'
-env_dir = 'testt'
-nb_ep = 10
-adversary_type = 'random'
-model_dir = 'random'
-out = test_model(algo, adversary_type,  model_dir, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'evals')
 
 
 # plot results
 
-env = defense_v0.env(terrain='benchmark_10x10_2v2', max_cycles=20, max_distance=5 )
-env.render()
-print('ok')
+#env = defense_v0.env(terrain='benchmark_10x10_2v2', max_cycles=20, max_distance=5 )
+#env.render()
+#print('ok')
+
+
+if __name__ == "__main__":
+    
+    algo = 'dqn'
+    model_dir = 'defense_params_dqn/benchmarking/071732mai2022step_0'
+    env_dir = 'testgenlib'
+    nb_ep = 1
+    adversary_type = 'random'
+    #model_dir = 'random'
+    out = test_model(algo, adversary_type,  model_dir, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'evalstestt1')

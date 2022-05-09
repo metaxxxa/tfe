@@ -1,18 +1,8 @@
-
-from ast import Param
-from datetime import datetime
-from doctest import DocTestFinder
 import torch
 import torch.nn as nn
 import numpy as np
-from collections import deque
-import itertools
-import random
-import copy
 import os
 import sys, getopt
-import re
-import pickle
 
 #importing the defense environment
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -63,13 +53,6 @@ class VDNMixer(nn.Module):
 
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr = self.args.LEARNING_RATE) #adding all parameters to optimizer at once
-
-    def get_agent_nets(self, agent):
-        if self.args.COMMON_AGENTS_NETWORK:
-            return self.agents_net
-        else:
-            return self.agent_nets[agent]
-    
         
     def forward(self, obs, Qin_t):
         
@@ -78,7 +61,7 @@ class VDNMixer(nn.Module):
         
     def get_Q_values(self, agent, obs,hidden_state):
         obs_t = torch.as_tensor(obs['obs'], dtype=torch.float32,device=device)
-        q_values, hidden_state_next = self.get_agent_nets(agent)(obs_t.unsqueeze(0), hidden_state)
+        q_values, hidden_state_next = self.agents_nets[agent](obs_t.unsqueeze(0), hidden_state)
         return q_values, hidden_state_next
 
     def get_Q_max(self, masked_q_values, obs, all_q_values=None):

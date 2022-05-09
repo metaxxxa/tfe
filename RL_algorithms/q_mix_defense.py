@@ -38,15 +38,15 @@ class QMixer(nn.Module):
         #params
         self.args = args
         total_state_dim = 0
+        self.agents_nets = dict()
         if self.args.COMMON_AGENTS_NETWORK:
             self.agents_net = AgentNet(self.args)
             for agent in self.args.blue_agents:
-                #self.agent_nets[agent] = self.agents_net
+                self.agents_nets[agent] = self.agents_net
                 total_state_dim += args.observations_dim              
 
         else:
             for agent in args.blue_agents:
-                self.agents_nets = dict()
                 self.agents_nets[agent] = AgentNet(args)
                 total_state_dim += np.prod(env.observation_space(agent).shape)
 
@@ -62,12 +62,6 @@ class QMixer(nn.Module):
         )
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr = self.args.LEARNING_RATE)
-
-    def get_agent_nets(self, agent):
-        if self.args.COMMON_AGENTS_NETWORK:
-            return self.agents_net
-        else:
-            return self.agent_nets[agent]
     
         
     def forward(self, obs_tot,Qin_t):
@@ -86,7 +80,7 @@ class QMixer(nn.Module):
         
     def get_Q_values(self, agent, obs,hidden_state):
         obs_t = torch.as_tensor(obs['obs'], dtype=torch.float32,device=device)
-        q_values, hidden_state_next = self.get_agent_nets(agent)(obs_t.unsqueeze(0), hidden_state)
+        q_values, hidden_state_next = self.agents_nets[agent](obs_t.unsqueeze(0), hidden_state)
         return q_values, hidden_state_next
 
     def get_Q_max(self, masked_q_values, obs, all_q_values=None):

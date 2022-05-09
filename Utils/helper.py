@@ -124,7 +124,7 @@ def obs_to_convInput(observation, env_size, max_num_agents):
     # 7 : aiming adversaries
     terrain = np.zeros([8, env_size, env_size]) #initiating terrain
     for i in range(0, int((len(obs)-max_num_agents*5)/2)):  #placing obstacles 
-        terrain[0, obs[max_num_agents*5+1+i], obs[max_num_agents*5+2+i]] = 1
+        terrain[0, obs[max_num_agents*5+i], obs[max_num_agents*5+1+i]] = 1
     
     terrain[1, obs[0], obs[1]] = obs[2]*1  #placing observing agent
     terrain[4, obs[0], obs[1]] = obs[3] 
