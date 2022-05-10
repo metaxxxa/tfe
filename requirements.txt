@@ -1,6 +1,6 @@
 numpy==1.22.2
 matplotlib==3.5.1
 gym==0.21.0
-pettingzoo
+pettingzoo==1.16.0
 torch==1.10.2
 tensorboard

@@ -72,7 +72,7 @@ class QMixer(nn.Module):
         weightsL2_tensor = weightsL2.unsqueeze(-1).reshape([self.args.BATCH_SIZE, self.args.mixer_hidden_dim2, self.args.mixer_hidden_dim])
         biasesL2 = self.biasesL2_net(obs_tot)
         l1 = torch.matmul(weightsL1_tensor, Qin_t.unsqueeze(-1)).squeeze(-1) + biasesL1
-        l1 = nn.ELU(l1).alpha
+        l1 = nn.ELU(l1)
         Qtot = torch.matmul(weightsL2_tensor, l1.unsqueeze(-1)).squeeze(-1) + biasesL2
         
         return Qtot
