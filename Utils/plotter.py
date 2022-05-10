@@ -32,6 +32,46 @@ def plot_eval(result_file):
     plt.show(block=False)
     plt.pause(10)
 
+def plot_eval_folder(resultfile, plot_folder, base_env, name):
+    sim_index, reward, steps, wins, nb_episodes = compute_results(resultfile)
+    folder_name = f'{plot_folder}/{base_env}_{name}'
+    if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+    x, y = zip(*sorted(zip(sim_index, reward)))
+    plt.plot(x, y)
+    plt.legend()
+    plt.xlabel('Similarity Index')
+    plt.ylabel('Reward /agent')
+    plt.title(f'Reward for agent trained on {base_env} (averaged over {nb_episodes} episodes)')
+    plt.show(block=False)
+    plt.pause(10)
+    plt.savefig(f'{folder_name}/reward_plot.png')
+    plt.close()
+
+    x, y = zip(*sorted(zip(sim_index, steps)))
+    plt.plot(x, y)
+    plt.legend()
+    plt.xlabel('Similarity Index')
+    plt.ylabel('Steps /episode')
+    plt.title(f'Steps per episode for agent trained on {base_env} (averaged over {nb_episodes} episodes)')
+    plt.show(block=False)
+    plt.pause(10)
+    plt.savefig(f'{folder_name}/steps_plot.png')
+    plt.close()
+
+    x, y = zip(*sorted(zip(sim_index, wins)))
+    plt.plot(x, y)
+    plt.legend()
+    plt.xlabel('Similarity Index')
+    plt.ylabel('Win rate')
+    plt.title(f'Win rate for agent trained on {base_env} (averaged over {nb_episodes} episodes)')
+    plt.show(block=False)
+    plt.pause(10)
+    plt.savefig(f'{folder_name}/wins_plot.png')
+    plt.close()
+
+
+
 def compute_results(result_file):
 
     with open(result_file,"rb") as f:
@@ -43,15 +83,24 @@ def compute_results(result_file):
     mean_reward_per_env = {}
     mean_steps_per_env = {}
     mean_wins_per_env = {}
+    sim_per_env = {}
     mean_reward = 0
     mean_steps = 0
     mean_wins = 0
+    reward = []
+    steps = []
+    wins = []
+    sim_index = []
     print('---          ---          ---')
     for env, metrics in results['envs'].items():
+        sim_index.append(float(env.split('simIndex_')[-1].split('_')[0]))
+        reward.append(np.mean(metrics['rewards']))
+        steps.append(np.mean(metrics['steps']))
+        wins.append( np.sum(metrics['wins'])/nb_episodes)
         mean_reward_per_env[env] = np.mean(metrics['rewards'])
         mean_steps_per_env[env] = np.mean(metrics['steps'])
         mean_wins_per_env[env] = np.sum(metrics['wins'])/nb_episodes
-        print(f'Environment : {env}\nMean reward: {mean_reward_per_env[env]} | Mean nb steps: {mean_steps_per_env[env]} | Win : {100*mean_wins_per_env[env]}%')
+        #print(f'Environment : {env}\nMean reward: {mean_reward_per_env[env]} | Mean nb steps: {mean_steps_per_env[env]} | Win : {100*mean_wins_per_env[env]}%')
         mean_reward += np.mean(metrics['rewards']) 
         mean_steps += np.mean(metrics['steps'])
         mean_wins += np.sum(metrics['wins'])/nb_episodes
@@ -62,6 +111,7 @@ def compute_results(result_file):
     print(f'Means over whole environment folder:\nReward {mean_reward} | Steps : {mean_steps} | Wins : {100*mean_wins}%')
     print('---          ---          ---')
     
+    return sim_index, reward, steps, wins, nb_episodes
 
 
 def plot_nn(model, algo):
@@ -100,9 +150,10 @@ def plot_tensorboard_log(json_file, data_type, algo, env, name, size=(10,5)):
 
 if __name__ == "__main__":
 
-    test = 'evals/results_dqn_testt_random.bin'
+    test = 'evalstestt1/results_dqn_testgenlib_071732mai2022step_0.bin'
     compute_results(test)
-
+    plot_eval(test)
+    plot_eval_folder(test, 'testfolderplot', 'benchmark10_1v1', 'firstjet')
     qmixloss_benchmark = 'toplot/Apr12_16-18-44_qmix_log.json'
     plot_tensorboard_log(qmixloss_benchmark, 'loss', 'QMIX', 'benchmark', 'benchmark/loss_qmix_benchmark')
 

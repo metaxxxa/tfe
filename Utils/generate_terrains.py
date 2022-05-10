@@ -37,7 +37,8 @@ def generate_on_diff(size, nb_agents, base_terrain, similarity_index, tolerance,
     error = tolerance*1.1
     steps = 3
     while error > tolerance:
-        for i in np.linspace(0,1, steps):
+        #for i in np.linspace(0,1, steps):
+        for i in (1-np.logspace(-9, 0, base =2, num=steps)):  #high number of obstacles directly lead to more environments in the small similarity index range
             terrain_generated = generate_random(size, nb_agents, i)
             error = abs(helper.similarity_index(utilities.load_terrain(base_terrain), terrain_generated, lines, window) - similarity_index)
             if error < tolerance:

@@ -24,7 +24,7 @@ device = get_device()
 
 #environment constants
 constants = Constants()
-TERRAIN = 'benchmark_10x10_1v1'
+TERRAIN = 'benchmark_10x10_2v2'
 
 MODEL_DIR = 'defense_params_qmix'
 RUN_NAME = 'benchmarking'
@@ -74,7 +74,7 @@ class QMixer(nn.Module):
         l1 = torch.matmul(weightsL1_tensor, Qin_t.unsqueeze(-1)).squeeze(-1) + biasesL1
         l1 = nn.ELU(l1).alpha
         Qtot = torch.matmul(weightsL2_tensor, l1.unsqueeze(-1)).squeeze(-1) + biasesL2
-        Qtot = Qtot.sum(1)
+        #Qtot = Qtot.sum(1)
         
         return Qtot
         

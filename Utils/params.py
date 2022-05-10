@@ -10,6 +10,8 @@ class DQNArgs:
     def __init__(self, env):
         self.ALGO = 'dqn'
         self.device = get_device()
+        self.ENV_FOLDER = ''
+        self.CHANGE_ENV = False
         self.BUFFER_SIZE = 2000
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
@@ -17,15 +19,15 @@ class DQNArgs:
         self.GAMMA = 0.9
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 10000
+        self.EPSILON_DECAY = 100000
         self.SYNC_TARGET_FRAMES = 200
-        self.STOP_TRAINING = self.EPSILON_DECAY*5
+        self.STOP_TRAINING = self.EPSILON_DECAY*3
         self.RNN = False
-        self.USE_PER = True
+        self.USE_PER = False
         self.EPSILON_PER = 0.0001
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
-        self.DOUBLE_DQN = True 
+        self.DOUBLE_DQN = False 
         self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
@@ -97,6 +99,8 @@ class QMIXArgs:
     def __init__(self, env):
         self.ALGO = 'qmix'
         self.device = get_device()
+        self.ENV_FOLDER = ''
+        self.CHANGE_ENV = False
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
@@ -106,7 +110,7 @@ class QMIXArgs:
         self.GAMMA = 0.85
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 10000
+        self.EPSILON_DECAY = 20000
         self.SYNC_TARGET_FRAMES = 2000
         self.STOP_TRAINING = self.EPSILON_DECAY*100
         self.USE_PER = False
@@ -154,7 +158,7 @@ class QMIXArgs:
         self.hidden_layer2_dim = 64
         #mixing network parameters
         self.mixer_hidden_dim = 32
-        self.mixer_hidden_dim2 = 32
+        self.mixer_hidden_dim2 = 1
         #environment specific parameters calculation
         self.ENV_SIZE = 10 #to calculate 
         self.WINNING_REWARD = 1
@@ -189,6 +193,8 @@ class VDNArgs:
     def __init__(self, env):
         self.ALGO = 'vdn'
         self.device = get_device()
+        self.ENV_FOLDER = ''
+        self.CHANGE_ENV = False
             
         self.BUFFER_SIZE = 2000
         self.REW_BUFFER_SIZE = 1000
@@ -246,7 +252,7 @@ class VDNArgs:
         self.hidden_layer2_dim = 64
         #mixing network parameters
         self.mixer_hidden_dim = 32
-        self.mixer_hidden_dim2 = 32
+        self.mixer_hidden_dim2 = 1
         #environment specific parameters calculation
         self.ENV_SIZE = 10 #to calculate 
         self.WINNING_REWARD = 1

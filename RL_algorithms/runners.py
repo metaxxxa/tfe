@@ -12,11 +12,34 @@ import os
 import pickle
 import re
 import itertools
+import sys
+
+#importing the defense environment
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+os.chdir(BASE_DIR)
+sys.path.insert(0, BASE_DIR)
+from env import defense_v0
+
+from Utils import helper
+from Utils.helper import Buffers, Params, Metrics, Constants, mask_array, get_device
+constants = Constants()
 
 class Runner:
     def __init__(self, env, args, TERRAIN):
         self.args = args
         self.env = env
+
+        if self.args.ENV_FOLDER != '':
+            self.CHANGE_ENV = True
+            self.ter_array = []
+            self.ter_ind = 0
+            for filename in os.listdir(f'env/terrains/{self.args.ENV_FOLDER}'):
+                self.ter_array.append(f'{self.args.ENV_FOLDER}/{filename[0:-4]}')
+            self.env = defense_v0.env(terrain=self.ter_array[self.ter_ind] , max_cycles=constants.EPISODE_MAX_LENGTH, max_distance=constants.MAX_DISTANCE )
+            self.env.reset()
+          
+
         self.blue_team_buffers = Buffers(self.env, self.args, self.args.blue_agents, args.device)
         self.opposing_team_buffers = Buffers(self.env, self.args, self.args.opposing_agents, args.device)
         if self.args.ALGO == 'qmix':
@@ -48,6 +71,17 @@ class Runner:
         
         
         #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
+    
+    def change_terrain(self):
+        if self.args.CHANGE_ENV:
+            self.ter_ind += 1
+            self.env = defense_v0.env(terrain=self.ter_array[self.ter_ind] , max_cycles=constants.EPISODE_MAX_LENGTH, max_distance=constants.MAX_DISTANCE )
+            
+            
+            if self.ter_ind >= (len(self.ter_array) - 1):
+                self.ter_ind = 0
+        self.env.reset()
+    
     def random_action(self, agent, obs):
         if all(element == 0 for element in obs['action_mask']):
             return None
@@ -385,7 +419,8 @@ class Runner:
                     self.give_global_reward()
                     self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents) #
                     self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
-                    self.env.reset()
+
+                    self.change_terrain()
                     
                     self.reset_buffers()
                 self.store_transition(True)
@@ -436,7 +471,7 @@ class Runner:
                     self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
                     self.writer.add_scalar("Steps", self.blue_team_buffers.nb_transitions,step  )
                     self.writer.add_scalar("Win", int(self.winner_is_blue()),step  )
-                self.env.reset()
+                self.change_terrain()
                 self.reset_buffers()
                 #self.train(step) #training only after each episode
             self.store_transition()

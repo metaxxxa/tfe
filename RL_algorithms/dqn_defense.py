@@ -108,6 +108,15 @@ class Runner:
     def __init__(self, env, args):
         self.args = args
         self.env = env
+        if self.args.ENV_FOLDER != '':
+            self.args.CHANGE_ENV = True
+            self.ter_array = []
+            self.ter_ind = 0
+            for filename in os.listdir(f'env/terrains/{self.args.ENV_FOLDER}'):
+                self.ter_array.append(f'{self.args.ENV_FOLDER}/{filename[0:-4]}')
+            self.env = defense_v0.env(terrain=self.ter_array[self.ter_ind] , max_cycles=constants.EPISODE_MAX_LENGTH, max_distance=constants.MAX_DISTANCE )
+            self.env.reset()
+
         self.env_size = 10  #try to get from environment
         self.blue_team_buffers = Buffers(self.env, self.args, self.args.blue_agents, device)
         self.opposing_team_buffers = Buffers(self.env, self.args, self.args.red_agents, device)
@@ -129,7 +138,7 @@ class Runner:
             if self.args.CONVOLUTIONAL_INPUT:
                 pass #to implement if time
             else:
-                self.writer.add_graph(self.online_nets[self.args.blue_agents[0]],torch.empty((self.args.observations_dim),device=device) )
+                pass #self.writer.add_graph(self.online_nets[self.args.blue_agents[0]],torch.empty((self.args.observations_dim),device=device) )
         
         self.sync_networks()
         
@@ -144,6 +153,15 @@ class Runner:
 
         #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
     
+    def change_terrain(self):
+        if self.args.CHANGE_ENV:
+            self.ter_ind += 1
+            self.env = defense_v0.env(terrain=self.ter_array[self.ter_ind] , max_cycles=constants.EPISODE_MAX_LENGTH, max_distance=constants.MAX_DISTANCE )
+                        
+            if self.ter_ind >= (len(self.ter_array) - 1):
+                self.ter_ind = 0
+        self.env.reset()
+
     def observe(self, agent):
         observation = copy.deepcopy(self.env.observe(agent))
         
@@ -368,8 +386,7 @@ class Runner:
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
                 self.blue_team_buffers.steps_buffer.append(self.blue_team_buffers.episode_reward)
                 self.blue_team_buffers.wins_buffer.append(self.blue_team_buffers.episode_reward)
-                
-                self.env.reset()
+                self.change_terrain()
                 
                 self.reset_buffers()
             self.store_transition(True)
@@ -418,8 +435,7 @@ class Runner:
                     self.writer.add_scalar("Reward", self.blue_team_buffers.episode_reward,step  )
                     self.writer.add_scalar("Steps", self.blue_team_buffers.nb_transitions,step  )
                     self.writer.add_scalar("Win", int(self.winner_is_blue()),step  )
-                
-                self.env.reset()
+                self.change_terrain()
                 self.reset_buffers()
 
             self.store_transition()
