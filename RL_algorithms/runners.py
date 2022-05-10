@@ -116,8 +116,7 @@ class Runner:
                 self.transition[agent] = [self.blue_team_buffers.observation[agent], self.blue_team_buffers.action[agent],reward,done,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
                 self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
                 self.blue_team_buffers.hidden_state[agent] = self.blue_team_buffers.hidden_state_next[agent]
-            if reward != -0.01:
-                print('chek')
+    
     def observe(self, agent):
         observation = copy.deepcopy(self.env.observe(agent))
         
