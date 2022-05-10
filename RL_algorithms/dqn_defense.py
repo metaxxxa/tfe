@@ -130,15 +130,17 @@ class Runner:
         if self.args.TENSORBOARD:
             #setting up TensorBoard
             from torch.utils.tensorboard import SummaryWriter
-            from Utils.plotter import plot_nn
-            plot_nn(self.online_nets[self.args.blue_agents[0]], 'DQN') #to visualize the neural network
             self.writer = SummaryWriter()
             args.log_params(TERRAIN, self.writer)
-                #display model graphs in tensorboard
-            if self.args.CONVOLUTIONAL_INPUT:
-                pass #to implement if time
-            else:
-                pass #self.writer.add_graph(self.online_nets[self.args.blue_agents[0]],torch.empty((self.args.observations_dim),device=device) )
+            if self.args.EXTRA_PLOTS:
+                from Utils.plotter import plot_nn
+                plot_nn(self.online_nets[self.args.blue_agents[0]], 'DQN') #to visualize the neural network
+                
+                    #display model graphs in tensorboard
+                if self.args.CONVOLUTIONAL_INPUT:
+                    pass #to implement if time
+                else:
+                    pass #self.writer.add_graph(self.online_nets[self.args.blue_agents[0]],torch.empty((self.args.observations_dim),device=device) )
         
         self.sync_networks()
         

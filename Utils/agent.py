@@ -66,11 +66,11 @@ class AgentNet(nn.Module):
     def forward(self, obs_t, hidden_state_t):
         if self.RNN:
             if self.CONVOLUTIONAL_INPUT:
-                input = self.conv_layer(obs_t)
+                input = self.conv_layer(obs_t).unsqueeze(0)
             else:
                 input = obs_t
             in_gru = self.relu(self.mlp1(input))
-            hidden_next = self.gru(in_gru.unsqueeze(0), hidden_state_t)
+            hidden_next = self.gru(in_gru, hidden_state_t)
             q_values = self.mlp2(hidden_next)
             return q_values, hidden_next
         else:

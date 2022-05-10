@@ -58,15 +58,16 @@ class Runner:
         if self.args.TENSORBOARD:
             from torch.utils.tensorboard import SummaryWriter
             self.writer = SummaryWriter()
-            from Utils.plotter import plot_nn
+            if self.args.EXTRA_PLOTS:
+                from Utils.plotter import plot_nn
 
-            plot_nn(self.online_net.agents_nets[self.args.blue_agents[0]], f'{self.args.ALGO.upper()} Agent') #to visualize the neural network
-            
-            plot_nn(self.online_net, f'{self.args.ALGO.upper()} Mixer')
-            args.log_params(self.writer, self.args.ALGO, TERRAIN)
-            #self.writer.add_graph(self.online_net.agents_nets[self.args.blue_agents[0]],(torch.empty((self.args.observations_dim),device=device), torch.empty((1, self.args.dim_L2_agents_net),device=device)) )
-            #self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
-           #                 , torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
+                plot_nn(self.online_net.agents_nets[self.args.blue_agents[0]], f'{self.args.ALGO.upper()} Agent') #to visualize the neural network
+                
+                plot_nn(self.online_net, f'{self.args.ALGO.upper()} Mixer')
+                args.log_params(self.writer, self.args.ALGO, TERRAIN)
+                #self.writer.add_graph(self.online_net.agents_nets[self.args.blue_agents[0]],(torch.empty((self.args.observations_dim),device=device), torch.empty((1, self.args.dim_L2_agents_net),device=device)) )
+                #self.writer.add_graph(self.online_net, (torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents*self.args.observations_dim), device=device)
+            #                 , torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
         self.sync_networks()
         
         
@@ -115,6 +116,8 @@ class Runner:
                 self.transition[agent] = [self.blue_team_buffers.observation[agent], self.blue_team_buffers.action[agent],reward,done,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
                 self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
                 self.blue_team_buffers.hidden_state[agent] = self.blue_team_buffers.hidden_state_next[agent]
+            if reward != -0.01:
+                print('chek')
     def observe(self, agent):
         observation = copy.deepcopy(self.env.observe(agent))
         

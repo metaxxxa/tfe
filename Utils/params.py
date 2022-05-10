@@ -23,11 +23,11 @@ class DQNArgs:
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*3
         self.RNN = False
-        self.USE_PER = False
+        self.USE_PER = True
         self.EPSILON_PER = 0.0001
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
-        self.DOUBLE_DQN = False 
+        self.DOUBLE_DQN = True 
         self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
@@ -52,6 +52,7 @@ class DQNArgs:
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.01
         self.GREEDY = True
+        self.EXTRA_PLOTS = False
         #logging
         self.TENSORBOARD = True
         self.REW_BUFFER_SIZE = 10000
@@ -110,7 +111,7 @@ class QMIXArgs:
         self.GAMMA = 0.85
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 20000
+        self.EPSILON_DECAY = 10000
         self.SYNC_TARGET_FRAMES = 2000
         self.STOP_TRAINING = self.EPSILON_DECAY*100
         self.USE_PER = False
@@ -118,8 +119,8 @@ class QMIXArgs:
         self.ALPHA_PER = 0.6
         self.B_PER = 0.4
         self.RNN = True
-        self.DOUBLE_DQN = True
-        self.CONVOLUTIONAL_INPUT = True
+        self.DOUBLE_DQN = False
+        self.CONVOLUTIONAL_INPUT = False
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
         self.KERNEL_SIZE = 1
@@ -142,8 +143,10 @@ class QMIXArgs:
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.0001
         self.GREEDY = True
+        self.EXTRA_PLOTS = False
         #logging
         self.TENSORBOARD = True
+        
         #saving models
         self.ITER_START_STEP = 0 #when starting training with an already trained model, 0 by default without model to load
         self.MODEL_TO_LOAD = ''
@@ -236,6 +239,7 @@ class VDNArgs:
         self.VISUALIZE = False
         self.WAIT_BETWEEN_STEPS = 0.0001
         self.GREEDY = True
+        self.EXTRA_PLOTS = False
         #logging
         self.TENSORBOARD = True
         #saving models
