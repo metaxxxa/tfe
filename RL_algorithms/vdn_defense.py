@@ -39,15 +39,15 @@ class VDNMixer(nn.Module):
         #params
         self.args = args
         total_state_dim = 0
+        self.agents_nets = dict()
         if self.args.COMMON_AGENTS_NETWORK:
             self.agents_net = AgentNet(self.args)
             for agent in self.args.blue_agents:
-                #self.agent_nets[agent] = self.agents_net
+                self.agents_nets[agent] = self.agents_net
                 total_state_dim += np.prod(env.observation_space(agent).spaces['obs'].shape)               
 
         else:
             for agent in args.blue_agents:
-                self.agents_nets = dict()
                 self.agents_nets[agent] = AgentNet(args)
                 total_state_dim += np.prod(env.observation_space(agent).shape)
 
