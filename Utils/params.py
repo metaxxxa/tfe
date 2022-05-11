@@ -108,10 +108,10 @@ class QMIXArgs:
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
-        self.GAMMA = 0.85
+        self.GAMMA = 0.9
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 50000
+        self.EPSILON_DECAY = 300000
         self.SYNC_TARGET_FRAMES = 2000
         self.STOP_TRAINING = self.EPSILON_DECAY*100
         self.USE_PER = False
@@ -120,7 +120,7 @@ class QMIXArgs:
         self.B_PER = 0.4
         self.RNN = True
         self.DOUBLE_DQN = False
-        self.CONVOLUTIONAL_INPUT = False
+        self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
         self.KERNEL_SIZE = 1
