@@ -267,14 +267,11 @@ class Runner:
             dirname = self.args.MODEL_DIR + '/' +datetime.now().strftime("%d%H%M%b%Y")+ f'step_{train_step}'
 
         if not os.path.exists(dirname):
-            os.makedirs(dirname)
+            os.makedirs(f'{dirname}/agent_nets_params')
         torch.save(self.online_net.state_dict(), dirname + '/' + '/qmix_net_params.pt')
         torch.save(self.target_net.state_dict(), dirname + '/' + '/qmix_target_net_params.pt')
-        if self.args.COMMON_AGENTS_NETWORK:
-            torch.save(self.online_net.agents_net.state_dict(),  dirname + '/agents_net_params.pt')
-        else:
-            for agent in self.args.blue_agents:
-                torch.save(self.online_net.agents_nets.state_dict(),  dirname + '/agent_nets_params/'  + agent + '.pt')
+        for agent in self.args.blue_agents:
+                torch.save(self.online_net.agents_nets[agent].state_dict(),  dirname + '/agent_nets_params/'  + agent + '.pt')
         with open(f'{dirname}/loading_parameters.bin',"wb") as f:
             pickle.dump(params, f)
 
@@ -288,6 +285,8 @@ class Runner:
             if self.args.COMMON_AGENTS_NETWORK:
                 agent_model = dir + '/agents_net_params.pt'
                 self.adversary_net.agents_net.load_state_dict(torch.load(agent_model))
+                for agent in self.args.blue_agents:
+                    self.agents_nets[agent] = self.agents_net
             else:
                 for agent in self.args.red_agents:
                     agent_model = dir + '/agent_nets_params/' + agent +'.pt'
@@ -301,7 +300,9 @@ class Runner:
             self.target_net.load_state_dict(torch.load(target_model))
             if self.args.COMMON_AGENTS_NETWORK:
                 agent_model = dir + '/agents_net_params.pt'
-                self.online_net.agents_net.load_state_dict(torch.load(agent_model))
+                self.adversary_net.agents_net.load_state_dict(torch.load(agent_model))
+                for agent in self.args.blue_agents:
+                    self.agents_nets[agent] = self.agents_net
             else:
                 for agent in self.args.blue_agents:
                     agent_model = dir + '/agent_nets_params/' + agent +'.pt'
