@@ -48,7 +48,7 @@ class QMixer(nn.Module):
         else:
             for agent in args.blue_agents:
                 self.agents_nets[agent] = AgentNet(args)
-                total_state_dim += np.prod(env.observation_space(agent).shape)
+                total_state_dim += args.observations_dim 
 
 
         self.weightsL1_net = nn.Linear(total_state_dim, self.args.mixer_hidden_dim*self.args.n_blue_agents, device=device)
