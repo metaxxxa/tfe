@@ -23,10 +23,10 @@ class DQNArgs:
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*3
         self.RNN = False
-        self.USE_PER = True
+        self.USE_PER = False
         self.EPSILON_PER = 0.0001
-        self.ALPHA_PER = 0.6
-        self.B_PER = 0.4
+        self.ALPHA_PER_START = 0.6
+        self.B_PER_START = 0.4
         self.DOUBLE_DQN = True 
         self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
@@ -79,6 +79,9 @@ class DQNArgs:
 
     def params(self, env):  #environment specific parameters calculation
         
+        self.ALPHA_PER = self.ALPHA_PER_START
+        self.B_PER = self.B_PER_START
+
         self.blue_agents = [key for key in env.agents if re.match(rf'^{self.TEAM_TO_TRAIN}',key)]
         self.all_agents = env.agents
         self.red_agents = [key for key in env.agents if re.match(rf'^{self.OPPOSING_TEAM}',key)]
@@ -116,8 +119,8 @@ class QMIXArgs:
         self.STOP_TRAINING = self.EPSILON_DECAY*100
         self.USE_PER = False
         self.EPSILON_PER = 0.01
-        self.ALPHA_PER = 0.6
-        self.B_PER = 0.4
+        self.ALPHA_PER_START = 0.6
+        self.B_PER_START = 0.4
         self.RNN = True
         self.DOUBLE_DQN = False
         self.CONVOLUTIONAL_INPUT = True
@@ -154,7 +157,7 @@ class QMIXArgs:
         self.MODEL_DIR = 'defense_params_qmix'
         self.RUN_NAME = 'benchmarking'
         #agent network parameters
-        self.COMMON_AGENTS_NETWORK = True
+        self.COMMON_AGENTS_NETWORK = False
         self.dim_L1_agents_net = 32
         self.dim_L2_agents_net = 32
         self.hidden_layer1_dim = 64
@@ -173,6 +176,9 @@ class QMIXArgs:
 
     def params(self, env):  #environment specific parameters calculation
         
+        self.ALPHA_PER = self.ALPHA_PER_START
+        self.B_PER = self.B_PER_START
+
         self.blue_agents = [key for key in env.agents if re.match(rf'^{self.TEAM_TO_TRAIN}',key)]
         self.red_agents = [key for key in env.agents if re.match(rf'^{self.OPPOSING_TEAM}',key)]
         self.all_agents = env.agents
@@ -212,8 +218,8 @@ class VDNArgs:
         self.STOP_TRAINING = self.EPSILON_DECAY*50
         self.USE_PER = False
         self.EPSILON_PER = 0.01
-        self.ALPHA_PER = 0.6
-        self.B_PER = 0.4
+        self.ALPHA_PER_START = 0.6
+        self.B_PER_START = 0.4
         self.RNN = True
         self.DOUBLE_DQN = True
         self.CONVOLUTIONAL_INPUT = True
@@ -268,6 +274,9 @@ class VDNArgs:
 
     def params(self, env):  #environment specific parameters calculation
         
+        self.ALPHA_PER = self.ALPHA_PER_START
+        self.B_PER = self.B_PER_START
+
         self.blue_agents = [key for key in env.agents if re.match(rf'^{self.TEAM_TO_TRAIN}',key)]
         self.red_agents = [key for key in env.agents if re.match(rf'^{self.OPPOSING_TEAM}',key)]
         self.all_agents = env.agents

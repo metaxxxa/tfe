@@ -152,14 +152,28 @@ if __name__ == "__main__":
 
 
     ter = 'benchmark_10x10_1v1'
-    ter2 = 'benchmark_10x10_1v1_sym'
+    ter2 = 'benchmark_10x10_2v2'
     t = 'central_10x10'
+    
+    terrains = []
+    environments_directory = 'testsim'
+    for filename in os.listdir(f'env/terrains/{environments_directory}'):
+        f = os.path.join(environments_directory, filename)
+        filename = environments_directory + '/' + filename
+        terrains.append(filename.split('.ter')[0])
+    terrains.sort()
+    for ind, terrain  in enumerate(terrains):
+        im = build_terrain(utilities.load_terrain(terrain), True)
+        im[0].save(f'demo_val_ssi_with_lines_{ind}.png')
 
-    i = similarity_index(ter, t, True, 3)
-
-    env = defense_v0.env(terrain=ter, max_cycles=200, max_distance=5)
-    env.reset()
-    im = env.render(mode='rgb_array')
-    print(f'Similarity index: {i}')
+    
+    # env = defense_v0.env(terrain=ter, max_cycles=200, max_distance=5)
+    # env.reset()
+    # im = env.render(mode='rgb_array')
+    # 
+    # 
+    for t in terrains[1:]:
+        i = similarity_index(terrains[0], t, True, 3)
+        print(f'Similarity index: {i}')
     
 
