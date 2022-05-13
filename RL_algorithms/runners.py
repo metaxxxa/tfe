@@ -161,7 +161,6 @@ class Runner:
             self.blue_team_buffers.weights[index] = (self.args.BUFFER_SIZE*(self.blue_team_buffers.priority[index]/sum(self.blue_team_buffers.priority)))**-self.args.B_PER
 
     def anneal(self, step):
-        self.args.ALPHA_PER = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.ALPHA_PER_START, 0])
         self.args.B_PER = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.B_PER_START, 1])
         return np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.EPSILON_START, self.args.EPSILON_END])   
         

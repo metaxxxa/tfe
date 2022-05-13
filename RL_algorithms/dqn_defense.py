@@ -242,7 +242,7 @@ class Runner:
          
             
     def anneal(self, step):
-        self.args.ALPHA_PER = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.ALPHA_PER_START, 0])
+        
         self.args.B_PER = np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.B_PER_START, 1])
         return np.interp(step, [0, self.args.EPSILON_DECAY], [self.args.EPSILON_START, self.args.EPSILON_END])
 
