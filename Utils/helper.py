@@ -163,8 +163,8 @@ if __name__ == "__main__":
         terrains.append(filename.split('.ter')[0])
     terrains.sort()
     for ind, terrain  in enumerate(terrains):
-        im = build_terrain(utilities.load_terrain(terrain), True)
-        im[0].save(f'demo_val_ssi_with_lines_{ind}.png')
+        im = build_terrain(utilities.load_terrain(terrain), False)
+        im[0].save(f'demo_val_ssi_no_lines_{ind}.png')
 
     
     # env = defense_v0.env(terrain=ter, max_cycles=200, max_distance=5)
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     # 
     # 
     for t in terrains[1:]:
-        i = similarity_index(terrains[0], t, True, 3)
+        i = similarity_index(terrains[0], t, False, 3)
         print(f'Similarity index: {i}')
     
-
+    print(similarity_index(terrains[4], terrains[5], True, 3))

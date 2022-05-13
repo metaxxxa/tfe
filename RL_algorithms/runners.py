@@ -362,11 +362,11 @@ class Runner:
         # targets
         Qtot_max_target = self.target_net.forward(next_obses_t, Q_ins_target_t).detach()
         Qtot_online = self.online_net.forward(obses_t, Q_action_online_t)
-        y_tot = rewards_t + self.args.GAMMA*(1 - 1*all_agents_done_t)*Qtot_max_target
+        y_tot = rewards_t + self.args.GAMMA*(1 - 1*all_agents_done_t)*Qtot_max_target.squeeze(-1)
 
     ########### busy
         # loss 
-        error = y_tot - Qtot_online
+        error = y_tot - Qtot_online.squeeze(-1)
         
         if self.args.USE_PER:
             self.update_priorities(abs(error))
