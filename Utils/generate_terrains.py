@@ -47,7 +47,7 @@ def generate_on_diff(size, nb_agents, base_terrain, similarity_index, tolerance,
     return terrain_generated
 
 def generate_library(size, nb_agents, base_terrain, nb_env, folder, window=3, lines=False):
-    for i in np.linspace(0, 1, nb_env):
+    for i in np.linspace(0,0.25, nb_env):
         terrain = generate_random(size, nb_agents, i)
         similarity = helper.similarity_index(utilities.load_terrain(base_terrain), terrain, lines, window)
         id = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(6)]) + f'_simIndex_{similarity}'
@@ -69,6 +69,6 @@ if __name__ == "__main__":
     for i in range(1,6):
         print(helper.similarity_index(base, f'test/sim{i}_', lines, window))
     
-    generate_library(10, 1, 'benchmark_10x10_1v1', 100, 'testgenlib')
+    generate_library(10, 1, 'benchmark_10x10_1v1', 10, 'training_lib')
   #  utilities.write_terrain('test', f'ondiff_ind={index}', t)
  #   helper.show_terrain(f'test/ondiff_ind={index}')
