@@ -157,7 +157,7 @@ class QMIXArgs:
         self.MODEL_DIR = 'defense_params_qmix'
         self.RUN_NAME = 'benchmarking'
         #agent network parameters
-        self.COMMON_AGENTS_NETWORK = False
+        self.COMMON_AGENTS_NETWORK = True
         self.dim_L1_agents_net = 32
         self.dim_L2_agents_net = 32
         self.hidden_layer1_dim = 64
