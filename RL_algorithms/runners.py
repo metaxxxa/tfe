@@ -114,8 +114,6 @@ class Runner:
                     done = self.env.dones[agent]
                 self.blue_team_buffers.observation_next[agent] = self.observe(agent)
                 self.blue_team_buffers.episode_reward += reward
-                if reward > -0.01:
-                    print('c')
                 self.transition[agent] = [self.blue_team_buffers.observation[agent], self.blue_team_buffers.action[agent],reward,done,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
                 self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
                 self.blue_team_buffers.hidden_state[agent] = self.blue_team_buffers.hidden_state_next[agent]
@@ -363,12 +361,12 @@ class Runner:
         all_agents_done_t = all_agents_done_t == dones_t.shape[1]
         # targets
         Qtot_max_target = self.target_net.forward(next_obses_t, Q_ins_target_t).squeeze(-1).detach()
-        Qtot_online = self.online_net.forward(obses_t, Q_action_online_t)
+        Qtot_online = self.online_net.forward(obses_t, Q_action_online_t).squeeze(-1)
         y_tot = rewards_t + self.args.GAMMA*(1 - 1*all_agents_done_t)*Qtot_max_target
 
     ########### busy
         # loss 
-        error = y_tot - Qtot_online.squeeze(-1)
+        error = y_tot - Qtot_online
         
         if self.args.USE_PER:
             self.update_priorities(abs(error))
