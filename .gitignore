@@ -3,7 +3,7 @@ nets/*
 env/__pycache__/
 algorithms/__pycache__/
 figures/*.png
-.vscode/launch.json
+.vscode
 runs/
 img
 toplot

@@ -23,11 +23,11 @@ class DQNArgs:
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*3
         self.RNN = False
-        self.USE_PER = False
+        self.USE_PER = True
         self.EPSILON_PER = 0.0001
         self.ALPHA_PER_START = 0.6
         self.B_PER_START = 0.4
-        self.DOUBLE_DQN = False 
+        self.DOUBLE_DQN = True 
         self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
@@ -114,9 +114,9 @@ class QMIXArgs:
         self.GAMMA = 0.9
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 100000
+        self.EPSILON_DECAY = 20000
         self.SYNC_TARGET_FRAMES = 2000
-        self.STOP_TRAINING = self.EPSILON_DECAY*3
+        self.STOP_TRAINING = self.EPSILON_DECAY*30
         self.USE_PER = False
         self.EPSILON_PER = 0.01
         self.ALPHA_PER_START = 0.6

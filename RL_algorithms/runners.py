@@ -114,6 +114,8 @@ class Runner:
                     done = self.env.dones[agent]
                 self.blue_team_buffers.observation_next[agent] = self.observe(agent)
                 self.blue_team_buffers.episode_reward += reward
+                if reward > -0.01:
+                    print('c')
                 self.transition[agent] = [self.blue_team_buffers.observation[agent], self.blue_team_buffers.action[agent],reward,done,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
                 self.blue_team_buffers.observation[agent] = self.blue_team_buffers.observation_next[agent]
                 self.blue_team_buffers.hidden_state[agent] = self.blue_team_buffers.hidden_state_next[agent]
@@ -191,7 +193,8 @@ class Runner:
         else:
             reward = 0
             if len(self.transition) != 0:
-                reward = list(self.transition.items())[0][-1][2]  #all agents have the same reward as the agents still in the game
+                reward = -0.01 # 0 reward for dead agents
+                #reward = list(self.transition.items())[0][-1][2]  #all agents have the same reward as the agents still in the game
             for agent in self.args.blue_agents:
                 if agent not in self.transition:  #done agents get 0 reward and keep same observation
                     self.transition[agent] = [self.blue_team_buffers.observation[agent], -1, reward, True,self.blue_team_buffers.observation_next[agent], self.blue_team_buffers.hidden_state[agent], self.blue_team_buffers.hidden_state_next[agent]]
@@ -214,7 +217,7 @@ class Runner:
     def give_global_reward(self):
 
         if self.winner_is_blue() == True: #need to find win criterium, normally first agent in agents left is blue team . > ??? to verify
-            reward = self.args.WINNING_REWARD
+            return #reward = self.args.WINNING_REWARD
         else:
             reward = self.args.LOSING_REWARD
         for agent in self.transition.keys():
@@ -359,9 +362,9 @@ class Runner:
         all_agents_done_t = dones_t.sum(1)
         all_agents_done_t = all_agents_done_t == dones_t.shape[1]
         # targets
-        Qtot_max_target = self.target_net.forward(next_obses_t, Q_ins_target_t).detach()
+        Qtot_max_target = self.target_net.forward(next_obses_t, Q_ins_target_t).squeeze(-1).detach()
         Qtot_online = self.online_net.forward(obses_t, Q_action_online_t)
-        y_tot = rewards_t + self.args.GAMMA*(1 - 1*all_agents_done_t)*Qtot_max_target.squeeze(-1)
+        y_tot = rewards_t + self.args.GAMMA*(1 - 1*all_agents_done_t)*Qtot_max_target
 
     ########### busy
         # loss 
