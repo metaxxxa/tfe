@@ -24,7 +24,7 @@ device = get_device()
 
 #environment constants
 constants = Constants()
-TERRAIN = 'benchmark_10x10_2v2'
+TERRAIN = 'benchmark_10x10_1v1'
 
 MODEL_DIR = 'defense_params_vdn'
 RUN_NAME = 'benchmarking'

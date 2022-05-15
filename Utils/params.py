@@ -23,11 +23,11 @@ class DQNArgs:
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*3
         self.RNN = False
-        self.USE_PER = True
+        self.USE_PER = False
         self.EPSILON_PER = 0.0001
         self.ALPHA_PER_START = 0.6
         self.B_PER_START = 0.4
-        self.DOUBLE_DQN = True 
+        self.DOUBLE_DQN = False 
         self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16
@@ -92,6 +92,8 @@ class DQNArgs:
         if self.CONVOLUTIONAL_INPUT:
             self.observations_dim = 8*self.ENV_SIZE**2
         self.n_actions = env.action_space(agent).n
+        if self.MODEL_TO_LOAD != '':
+            self.ITER_START_STEP = int(self.MODEL_TO_LOAD.split('_')[-1])
     def log_params(self, terrain, writer=None):
         hparams = {'envparam/terrrain': terrain,'Adversary tactic':self.ADVERSARY_TACTIC , 'Algorithm': 'DQN' , 'Learning rate': self.LEARNING_RATE, 'Batch size': self.BATCH_SIZE, 'Buffer size': self.BUFFER_SIZE, 'Min buffer length': self.MIN_BUFFER_LENGTH, '/gamma': self.GAMMA, 'Epsilon range': f'{self.EPSILON_START} - {self.EPSILON_END}', 'Epsilon decay': self.EPSILON_DECAY, 'Synchronisation rate': self.SYNC_TARGET_FRAMES, 'Timestamp': int(datetime.timestamp(datetime.now()) - datetime.timestamp(datetime(2022, 2, 1, 11, 26, 31,0)))}
         metric_dict = { 'hparam/dim L1 agent net': self.dim_L1_agents_net, 'hparam/dim L2 agent net': self.dim_L2_agents_net}
@@ -116,13 +118,13 @@ class QMIXArgs:
         self.EPSILON_END = 0.01
         self.EPSILON_DECAY = 100000
         self.SYNC_TARGET_FRAMES = 2000
-        self.STOP_TRAINING = self.EPSILON_DECAY*30
-        self.USE_PER = False
+        self.STOP_TRAINING = self.EPSILON_DECAY*3
+        self.USE_PER = True
         self.EPSILON_PER = 0.01
         self.ALPHA_PER_START = 0.6
         self.B_PER_START = 0.4
         self.RNN = True
-        self.DOUBLE_DQN = False
+        self.DOUBLE_DQN = True
         self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16

@@ -186,17 +186,18 @@ class Runner:
         for agent in self.env.agents:
             
             if self.is_opposing_team(agent):
-                if self.opposing_team_buffers.action[agent] == None:
-                    self.opposing_team_buffers.action[agent] = -1
-                    reward = 0
-                    done = True
-                else:
-                    reward = self.env._cumulative_rewards[agent]
-                    done = self.env.dones[agent]
-                self.opposing_team_buffers.observation_next[agent] = self.observe(agent)
-                self.opposing_team_buffers.episode_reward += reward
-                #store transition ?
-                self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
+                pass
+                # if self.opposing_team_buffers.action[agent] == None:
+                #     self.opposing_team_buffers.action[agent] = -1
+                #     reward = 0
+                #     done = True
+                # else:
+                #     reward = self.env._cumulative_rewards[agent]
+                #     done = self.env.dones[agent]
+                # self.opposing_team_buffers.observation_next[agent] = self.observe(agent)
+                # self.opposing_team_buffers.episode_reward += reward
+                # #store transition ?
+                # self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
             else:
                 if self.blue_team_buffers.action[agent] == None:
                     self.blue_team_buffers.action[agent] = -1
@@ -323,7 +324,7 @@ class Runner:
     def save_model(self, train_step):  #taken from https://github.com/koenboeckx/qmix/blob/main/qmix.py to save learnt model
         
         params = Params(train_step)
-        params.blue_team_replay_buffer = self.blue_team_buffers.replay_buffer
+        params.blue_team_buffers = self.blue_team_buffers
         if self.args.RUN_NAME != '':
             dirname = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") +f'step_{train_step}'
             dirname_agents = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") +f'step_{train_step}'+ '/agent_dqn_params/'
@@ -352,7 +353,10 @@ class Runner:
                     self.online_nets[agent].net.load_state_dict(torch.load(agent_model))
             with open(f'{dir}/loading_parameters.bin',"rb") as f:
                 self.loading_parameters = pickle.load(f)
-            self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
+            try:  #for previous version compatibility
+                self.blue_team_buffers = self.loading_parameters.blue_team_buffers
+            except:
+                self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
 
     def run(self):
         
@@ -360,47 +364,47 @@ class Runner:
         
         
         self.env.reset()
-
-        for _ in range(self.args.MIN_BUFFER_LENGTH):
-            
-            self.transition = dict() #to store the transition 
-            self.step_buffer() #count the number of transitions per episode
-            for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
-                if self.is_opposing_team(agent):
-                    self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
-                    action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
-                    if done:
-                        action = None
-                    self.opposing_team_buffers.action[agent] = action
-                    
-                else:
-                    self.blue_team_buffers.observation[agent], _, done, _ = self.last()
-                    action = self.random_action(agent, self.blue_team_buffers.observation[agent])
-                    if done:
-                        action = None
-                    self.blue_team_buffers.action[agent] = action
-                self.env.step(action)
-                self.visualize()
-            self.update_buffer()
-            
-            
-            #self.complete_transition()
-            if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
-                #self.give_global_reward()
-                self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents) #
-                self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
-                self.blue_team_buffers.steps_buffer.append(self.blue_team_buffers.episode_reward)
-                self.blue_team_buffers.wins_buffer.append(self.blue_team_buffers.episode_reward)
-                self.change_terrain()
+        if len(self.blue_team_buffers.replay_buffer) < self.args.MIN_BUFFER_LENGTH:
+            for _ in range(self.args.MIN_BUFFER_LENGTH):
                 
-                self.reset_buffers()
-            self.store_transition(True)
+                self.transition = dict() #to store the transition 
+                self.step_buffer() #count the number of transitions per episode
+                for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
+                    if self.is_opposing_team(agent):
+                        self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
+                        action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
+                        if done:
+                            action = None
+                        self.opposing_team_buffers.action[agent] = action
+                        
+                    else:
+                        self.blue_team_buffers.observation[agent], _, done, _ = self.last()
+                        action = self.random_action(agent, self.blue_team_buffers.observation[agent])
+                        if done:
+                            action = None
+                        self.blue_team_buffers.action[agent] = action
+                    self.env.step(action)
+                    self.visualize()
+                self.update_buffer()
+                
+                
+                #self.complete_transition()
+                if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
+                    #self.give_global_reward()
+                    self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents) #
+                    self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
+                    self.blue_team_buffers.steps_buffer.append(self.blue_team_buffers.episode_reward)
+                    self.blue_team_buffers.wins_buffer.append(self.blue_team_buffers.episode_reward)
+                    self.change_terrain()
+                    
+                    self.reset_buffers()
+                self.store_transition(True)
         # trainingoptim
 
         self.env.reset()
         self.reset_buffers()
         transitions_counter = 0
-        for step in itertools.count():
+        for step in itertools.count(start=self.args.ITER_START_STEP):   #modifying to continue training
             if transitions_counter > self.args.STOP_TRAINING:
                 break
             if step > self.args.VISUALIZE_AFTER:
@@ -527,14 +531,14 @@ class Runner:
             
         ###
 
-    def eval(self, params_directory, nb_episodes=10000, visualize = True, log = True):
+    def eval(self, params_directory, nb_episodes=200, visualize = False, log = False):
         results = Metrics(nb_episodes)
         self.env.reset()
         self.reset_buffers()
         if params_directory == 'random':
             self.transition = dict()
             ep_counter = 0
-            for _ in itertools.count(start=self.args.ITER_START_STEP):
+            for _ in itertools.count():
                 if ep_counter == nb_episodes:
                     break
                 self.step_buffer()
@@ -547,33 +551,34 @@ class Runner:
                         self.blue_team_buffers.observation[agent], _, done, _ = self.last()
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
                     if done:
-                        self.env.step(None)
-                        if visualize:
-                            self.env.render()
+                        action = None
+                    
+                    self.env.step(action)
+                    self.blue_team_buffers.action[agent] = action
+                    if visualize:
+                        self.env.render()
                         time.sleep(self.args.WAIT_BETWEEN_STEPS)
-                    else:
-                        self.env.step(action)
-                        
-                        time.sleep(self.args.WAIT_BETWEEN_STEPS)
-                #self.update_buffer()
+
+                self.update_buffer()
+                
                 if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
             
                     self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                     results.rewards_buffer.append(self.blue_team_buffers.episode_reward)
                     results.nb_steps.append(self.blue_team_buffers.nb_transitions)
                     results.wins.append(self.winner_is_blue())
-                    self.env.reset()
                     if visualize:
                         self.env.render()
                     if log:
                         print(f'Episode reward /agent: {self.blue_team_buffers.episode_reward}')
-                    #self.reset_buffers()
                     ep_counter += 1
+                    self.env.reset()
+                    self.reset_buffers()
         else:
             self.load_model(params_directory)
             self.transition = dict()
             ep_counter = 0
-            for _ in itertools.count(start=self.args.ITER_START_STEP):
+            for _ in itertools.count():
                 if ep_counter == nb_episodes:
                     break
                 self.step_buffer()
@@ -589,11 +594,12 @@ class Runner:
                         action = None
                     
                     self.env.step(action)
+                    self.blue_team_buffers.action[agent] =  action
                     if visualize:
                         self.env.render()
                         time.sleep(self.args.WAIT_BETWEEN_STEPS)
 
-                #self.update_buffer()
+                self.update_buffer()
 
                 if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
             
@@ -601,14 +607,23 @@ class Runner:
                     results.rewards_buffer.append(self.blue_team_buffers.episode_reward)
                     results.nb_steps.append(self.blue_team_buffers.nb_transitions)
                     results.wins.append(self.winner_is_blue())
-                    self.env.reset()
+                    
+                    
                     if visualize:
                         self.env.render()
                     if log:
                         print(f'Episode reward /agent: {self.blue_team_buffers.episode_reward}')
-                    #self.reset_buffers()
+                        print(f'Episode steps: {self.blue_team_buffers.nb_transitions}')
                     ep_counter += 1
+                    self.env.reset()
+                    self.reset_buffers()
 
+        reward = np.mean(results.rewards_buffer)
+        steps = np.mean(results.nb_steps)
+        wins = sum(results.wins)/nb_episodes
+        print(f'Mean reward per episode: {np.mean(results.rewards_buffer)}')
+        print(f'Mean steps per episode: {np.mean(results.nb_steps)}')
+        print(f'Mean win rate: {sum(results.wins)/nb_episodes}')
         return results
 
 
@@ -651,3 +666,11 @@ def main(argv):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+    # env = defense_v0.env(terrain=TERRAIN, max_cycles=constants.EPISODE_MAX_LENGTH, max_distance=constants.MAX_DISTANCE )
+    # env.reset()
+    # args_runner = Args(env)
+    # args_runner.MODEL_DIR = MODEL_DIR
+    # args_runner.RUN_NAME = RUN_NAME
+    # args_runner.ADVERSARY_TACTIC = ADVERSARY_TACTIC
+    # runner = Runner(env, args_runner)
+    # runner.eval('defense_params_dqn/benchmarking/151503mai2022step_50000/')

@@ -38,7 +38,8 @@ class Results:
 def test_model(algorithm, adversary_tactic, model_directory, environments_directory, nb_episodes, EPISODE_MAX_LENGTH, MAX_DISTANCE, save_directory = None): #test all environments of a directory with a given model
 
     results ={'algorithm': algorithm, 'model': model_directory, 'environments': environments_directory, 'nb episodes': nb_episodes, 'episode max length': EPISODE_MAX_LENGTH, 'max distance':  MAX_DISTANCE, 'envs': {}}
-
+    nb_env = len(os.listdir(f'env/terrains/{environments_directory}'))
+    i = 0
     for filename in os.listdir(f'env/terrains/{environments_directory}'):
         f = os.path.join(environments_directory, filename)
         
@@ -55,7 +56,10 @@ def test_model(algorithm, adversary_tactic, model_directory, environments_direct
         res = runner.eval(model_directory, nb_episodes, False, False)
         res.env = f'{filename[0:-4]}'
         results['envs'][res.env] = { 'steps': res.nb_steps, 'rewards': res.rewards_buffer, 'wins': res.wins}
-    
+        i+=1
+        if i % (nb_env/100) == 0:
+            progress : i/nb_env
+            print(f'{i} %')
     if save_directory !=None:
         if not os.path.exists(save_directory):
             os.makedirs(save_directory)
@@ -80,8 +84,8 @@ if __name__ == "__main__":
     
     algo = 'dqn'
     model_dir = 'defense_params_dqn/benchmarking/071732mai2022step_0'
-    env_dir = 'testgenlib'
+    env_dir = 'eval_lib'
     nb_ep = 3
     adversary_type = 'random'
     #model_dir = 'random'
-    out = test_model(algo, adversary_type,  model_dir, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'evalstestt1')
+    out = test_model(algo, adversary_type,  model_dir, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'eval_libtest1')
