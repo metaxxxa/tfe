@@ -122,7 +122,6 @@ class Runner:
         self.opposing_team_buffers = Buffers(self.env, self.args, self.args.red_agents, device)
         self.online_nets = {}
         self.target_nets = {}
-        self.online_nets_params = list()
         for agent in self.args.blue_agents:
             self.online_nets[agent] = DQN(self.env, self.args, self.env.observation_space(agent).spaces['obs'].shape, self.env.action_space(agent).n)
 
@@ -336,7 +335,7 @@ class Runner:
             os.makedirs(dirname_agents)
         for agent in self.args.blue_agents:
                 torch.save(self.online_nets[agent].net.state_dict(),  dirname_agents   + agent + '.pt')
-                torch.save(self.online_nets[agent].net.state_dict(),  dirname_agents + 'target_'   + agent + '.pt')
+                torch.save(self.target_nets[agent].net.state_dict(),  dirname_agents + 'target_'   + agent + '.pt')
         with open(f'{dirname}/loading_parameters.bin',"wb") as f:
             pickle.dump(params, f)
 
@@ -352,6 +351,7 @@ class Runner:
         else:            
             for agent in self.args.blue_agents:
                     agent_model = dir + '/agent_dqn_params/' + agent +'.pt'
+                    target_model = dir + '/agent_dqn_params/' + 'target_' + agent +'.pt'
                     self.online_nets[agent].net.load_state_dict(torch.load(agent_model))
                     try:
                         self.target_nets[agent].net.load_state_dict(torch.load(target_model))
@@ -538,7 +538,7 @@ class Runner:
             
         ###
 
-    def eval(self, params_directory, nb_episodes=200, visualize = False, log = False):
+    def eval(self, params_directory, nb_episodes=200, visualize = False, log = True):
         results = Metrics(nb_episodes)
         self.env.reset()
         self.reset_buffers()
@@ -625,12 +625,10 @@ class Runner:
                     self.env.reset()
                     self.reset_buffers()
 
-        reward = np.mean(results.rewards_buffer)
-        steps = np.mean(results.nb_steps)
-        wins = sum(results.wins)/nb_episodes
-        print(f'Mean reward per episode: {np.mean(results.rewards_buffer)}')
-        print(f'Mean steps per episode: {np.mean(results.nb_steps)}')
-        print(f'Mean win rate: {sum(results.wins)/nb_episodes}')
+        if log:
+            print(f'Mean reward per episode: {np.mean(results.rewards_buffer)}')
+            print(f'Mean steps per episode: {np.mean(results.nb_steps)}')
+            print(f'Mean win rate: {sum(results.wins)/nb_episodes}')
         return results
 
 

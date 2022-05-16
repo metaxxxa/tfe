@@ -1,20 +1,21 @@
 from asyncio import events
 from cgi import test
 import os, sys
-import csv
+import math
 import json
 from termios import XTABS
 import numpy as np
 from scipy.ndimage.filters import uniform_filter1d
+
 
 os.chdir('/home/jack/Documents/ERM/Master thesis/tfe')
 sys.path.insert(0, '/home/jack/Documents/ERM/Master thesis/tfe')
 import matplotlib.pyplot as plt
 plt.style.use('Utils/plot_style.txt')
 import pickle
-
+from Utils.helper import similarity_index
+COLORS = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:cyan']
 # plot results
-result_file = 'evals/results_dqn_testt_111943avril2022step_0.bin'
 def plot_eval(result_file):
     with open(result_file,"rb") as f:
         results = pickle.load(f)
@@ -32,41 +33,77 @@ def plot_eval(result_file):
     plt.show(block=False)
     plt.pause(10)
 
-def plot_eval_folder(resultfile, plot_folder, base_env, name):
-    sim_index, reward, steps, wins, nb_episodes = compute_results(resultfile)
+def plot_eval_folder(resultfile, plot_folder, base_env, name, figure_name, names=[], size=(10,5)):
+    filter_factor = 1
+
+
+    
     folder_name = f'{plot_folder}/{base_env}_{name}'
     if not os.path.exists(folder_name):
             os.makedirs(folder_name)
-    x, y = zip(*sorted(zip(sim_index, reward)))
-    plt.plot(x, y)
+    i= 0
+    
+    for file in resultfile:
+        similarity_index, reward, steps, wins, nb_episodes, reward_v, steps_v, wins_v = compute_results(file)
+
+        x, y = zip(*sorted(zip(similarity_index, reward)))
+        _, var = zip(*sorted(zip(similarity_index, reward_v)))
+        
+        if len(names) > 1:
+            plt.plot(x,  uniform_filter1d(y, size=filter_factor), color= COLORS[i], label=names[i])
+        else:
+            plt.plot(x,  uniform_filter1d(y, size=filter_factor), color= COLORS[i])
+        plt.errorbar(x, uniform_filter1d(y, size=filter_factor), yerr=var, fmt='o', ecolor=COLORS[i], color='white')
+        i += 1
     plt.legend()
     plt.xlabel('Similarity Index')
     plt.ylabel('Reward /agent')
-    plt.title(f'Reward for agent trained on {base_env} (averaged over {nb_episodes} episodes)')
+    plt.title(f'Reward for {figure_name} trained on {base_env}')
     plt.show(block=False)
-    plt.pause(10)
+    plt.pause(1)
+    
     plt.savefig(f'{folder_name}/reward_plot.png')
     plt.close()
+    i= 0
+    for file in resultfile:
+        similarity_index, reward, steps, wins, nb_episodes, reward_v, steps_v, wins_v = compute_results(file)
 
-    x, y = zip(*sorted(zip(sim_index, steps)))
-    plt.plot(x, y)
+        x, y = zip(*sorted(zip(similarity_index, steps)))
+        _, var = zip(*sorted(zip(similarity_index, steps_v)))
+        if len(names) != 0:
+            plt.plot(x,  uniform_filter1d(y, size=filter_factor), color=COLORS[i], label=names[i])
+        else:
+            plt.plot(x,  uniform_filter1d(y, size=filter_factor), color=COLORS[i])
+        plt.errorbar(x, uniform_filter1d(y, size=filter_factor), yerr=var, fmt='o', ecolor=COLORS[i], color='white')
+        i += 1
     plt.legend()
     plt.xlabel('Similarity Index')
     plt.ylabel('Steps /episode')
-    plt.title(f'Steps per episode for agent trained on {base_env} (averaged over {nb_episodes} episodes)')
+    plt.title(f'Steps per episode for {figure_name} trained on {base_env}')
     plt.show(block=False)
-    plt.pause(10)
+    plt.pause(1)
     plt.savefig(f'{folder_name}/steps_plot.png')
     plt.close()
+    i= 0
+    for file in resultfile:
+        similarity_index, reward, steps, wins, nb_episodes, reward_v, steps_v, wins_v = compute_results(file)
 
-    x, y = zip(*sorted(zip(sim_index, wins)))
-    plt.plot(x, y)
+        sim_index = similarity_index
+        w = wins
+        x, y = zip(*sorted(zip(similarity_index, wins)))
+        _, var = zip(*sorted(zip(similarity_index, wins_v)))
+        if len(names) != 0:
+            plt.plot(x,  uniform_filter1d(y, size=filter_factor), label=names[i], color=COLORS[i])
+        else:
+            plt.plot(x,  uniform_filter1d(y, size=filter_factor), color=COLORS[i])
+        plt.errorbar(x, uniform_filter1d(y, size=filter_factor), yerr=var, fmt='o', ecolor=COLORS[i], color='white')
+        i +=1 
     plt.legend()
     plt.xlabel('Similarity Index')
     plt.ylabel('Win rate')
-    plt.title(f'Win rate for agent trained on {base_env} (averaged over {nb_episodes} episodes)')
+    plt.title(f'Win rate for {figure_name} trained on {base_env}')
     plt.show(block=False)
-    plt.pause(10)
+    plt.pause(1)
     plt.savefig(f'{folder_name}/wins_plot.png')
     plt.close()
 
@@ -76,30 +113,35 @@ def compute_results(result_file):
 
     with open(result_file,"rb") as f:
         results = pickle.load(f)
-    plt.close('all')
+    f.close()
 
     nb_episodes = results['nb episodes']
     nb_env = len(results['envs'].keys())
     mean_reward_per_env = {}
     mean_steps_per_env = {}
     mean_wins_per_env = {}
-    sim_per_env = {}
     mean_reward = 0
     mean_steps = 0
     mean_wins = 0
     reward = []
     steps = []
     wins = []
+    reward_var = []
+    steps_var = []
+    wins_var = []
     sim_index = []
     print('---          ---          ---')
     for env, metrics in results['envs'].items():
         sim_index.append(float(env.split('simIndex_')[-1].split('_')[0]))
         reward.append(np.mean(metrics['rewards']))
+        reward_var.append(np.std(metrics['rewards']))
         steps.append(np.mean(metrics['steps']))
-        wins.append( np.sum(metrics['wins'])/nb_episodes)
+        steps_var.append(np.std(metrics['steps']))
+        wins.append( np.mean(metrics['wins']))
+        wins_var.append( np.std(metrics['wins']))
         mean_reward_per_env[env] = np.mean(metrics['rewards'])
         mean_steps_per_env[env] = np.mean(metrics['steps'])
-        mean_wins_per_env[env] = np.sum(metrics['wins'])/nb_episodes
+        mean_wins_per_env[env] = np.mean(metrics['wins'])
         #print(f'Environment : {env}\nMean reward: {mean_reward_per_env[env]} | Mean nb steps: {mean_steps_per_env[env]} | Win : {100*mean_wins_per_env[env]}%')
         mean_reward += np.mean(metrics['rewards']) 
         mean_steps += np.mean(metrics['steps'])
@@ -111,7 +153,7 @@ def compute_results(result_file):
     print(f'Means over whole environment folder:\nReward {mean_reward} | Steps : {mean_steps} | Wins : {100*mean_wins}%')
     print('---          ---          ---')
     
-    return sim_index, reward, steps, wins, nb_episodes
+    return sim_index, reward, steps, wins, nb_episodes, reward_var, steps_var, wins_var
 
 
 def plot_nn(model, algo):
@@ -146,7 +188,7 @@ def plot_tensorboard_log(json_file, data_type, algo, env, name, size=(10,5)):
     f.close()
 
 def plot_tensorboard_compare(json_files,names, data_type, algo, env, figure_name, size=(10,5)):
-    filter_factor = 300
+    filter_factor = 200
     data = {}
     step = {}
     i = 0
@@ -159,9 +201,14 @@ def plot_tensorboard_compare(json_files,names, data_type, algo, env, figure_name
         i += 1
     
     fig = plt.figure(figsize=size)
+    i = 0
     for name in names:
         #plt.plot(step[name], data[name], label=name)
-        plt.plot(step[name], uniform_filter1d(data[name], size=filter_factor), label=name)
+        plt.plot(step[name], uniform_filter1d(data[name], size=filter_factor), label=name, color=COLORS[i])
+        new_step, std_up, std_down = compute_variance(step[name], uniform_filter1d(data[name], size=filter_factor), 20)
+        plt.fill_between(new_step, std_down, std_up, color=COLORS[i] , alpha=0.1)
+
+        i+=1
     plt.xlabel('Step')
     if data_type == 'loss':
         if algo == 'QMIX':
@@ -170,9 +217,9 @@ def plot_tensorboard_compare(json_files,names, data_type, algo, env, figure_name
         
     elif data_type == 'reward':
         plt.ylabel('Reward /agent /episode')
-    elif data_type == 'step':
+    elif data_type == 'steps /episode':
         plt.ylabel('Steps /episode')
-    elif data_type == 'wins':
+    elif data_type == 'win rate':
         plt.axhline(0.8, c='r', ls=':')
         plt.ylabel('Win rate')
     plt.legend()
@@ -183,13 +230,32 @@ def plot_tensorboard_compare(json_files,names, data_type, algo, env, figure_name
     plt.pause(1)
     f.close()
 
+def compute_variance(steps, data, window=15):
+    new_step = []
+    std_up = []
+    std_down = []
+    Z = 10 #80 % confidence interval
+    for i in range(int(np.floor((len(data)-1)/window))+1):
+        segment = data[i*window:((i+1)*window -1)]
+        ci = np.std(segment)*5
+        std_up.append(data[i*window+int(np.floor((len(segment)-1)/2))] +ci )
+        std_down.append(data[i*window+int(np.floor((len(segment)-1)/2))] - ci)
+        new_step.append((steps[i*window+int(np.floor((len(segment)-1)/2))]))
+    return new_step, std_up, std_down
+
 
 
 if __name__ == "__main__":
 
-    # test = 'evalstestt1/results_dqn_testgenlib_071732mai2022step_0.bin'
-    # compute_results(test)
-    # plot_eval(test)
+    plain_dqn = 'eval_plaindqn3/results_dqn_eval_lib_fixedObs3_100238mai2022step_300000.bin'
+    plain_dqn_conv = 'eval_plaindqnconv/results_dqn_eval_lib_fixedObs3_.bin'
+    #plain_dqn = 'test/results_dqn_eval_lib_fixedObs3_100238mai2022step_300000.bin'
+
+    x = 'eval_plaindqn/results_dqn_eval_lib_fixedObs2_100238mai2022step_300000.bin'
+    plot_eval_folder([plain_dqn, plain_dqn_conv], 'results/plaindqn', 'benchmark10_1v1', 'test_trained_sameEnv', 'Plain DQN', ['Basic DQN', 'Conv DQN'])
+ 
+ #   plot_eval_folder([x], 'results/plaindqn', 'benchmark10_1v1', 'test_trained_sameEnv', 'Plain DQN', ['Basic DQN'])
+ 
     # plot_eval_folder(test, 'testfolderplot', 'benchmark10_1v1', 'firstjet')
     # qmixloss_benchmark = 'toplot/Apr12_16-18-44_qmix_log.json'
     # plot_tensorboard_log(qmixloss_benchmark, 'loss', 'QMIX', 'benchmark', 'benchmark/loss_qmix_benchmark')
@@ -218,11 +284,11 @@ if __name__ == "__main__":
 
     
     names = ['Plain DQN', 'Conv DQN', 'Conv DDQN', 'Conv DDQN PER', 'Conv DDQN PER with annealing']
-    plot_tensorboard_compare(json_dqn_loss, names, 'loss', 'dqn', 'benchmark', 'benchmark/dqn_compare_loss')
+ #   plot_tensorboard_compare(json_dqn_loss, names, 'loss', 'dqn', 'benchmark', 'benchmark/dqn_compare_loss')
 
 
-    plot_tensorboard_compare(json_dqn_reward, names, 'reward', 'dqn', 'benchmark', 'benchmark/dqn_compare_reward')
+ #   plot_tensorboard_compare(json_dqn_reward, names, 'reward', 'dqn', 'benchmark', 'benchmark/dqn_compare_reward')
 
-    plot_tensorboard_compare(json_dqn_steps, names, 'step', 'dqn', 'benchmark', 'benchmark/dqn_compare_steps')
+ #   plot_tensorboard_compare(json_dqn_steps, names, 'steps /episode', 'dqn', 'benchmark', 'benchmark/dqn_compare_steps')
 
-    plot_tensorboard_compare(json_dqn_wins, names, 'wins', 'dqn', 'benchmark', 'benchmark/dqn_compare_wins')
+  #  plot_tensorboard_compare(json_dqn_wins, names, 'win rate', 'dqn', 'benchmark', 'benchmark/dqn_compare_wins')

@@ -1,6 +1,7 @@
 
 import pickle
-import pandas as pd
+from pydoc import plain
+import math
 import os, sys
 import torch 
 os.chdir('/home/jack/Documents/ERM/Master thesis/tfe')
@@ -57,9 +58,9 @@ def test_model(algorithm, adversary_tactic, model_directory, environments_direct
         res.env = f'{filename[0:-4]}'
         results['envs'][res.env] = { 'steps': res.nb_steps, 'rewards': res.rewards_buffer, 'wins': res.wins}
         i+=1
-        if i % (nb_env/100) == 0:
-            progress : i/nb_env
-            print(f'{i} %')
+        if i % math.ceil(nb_env/100) == 0:
+            progress = i/nb_env
+            print(f'{progress} %')
     if save_directory !=None:
         if not os.path.exists(save_directory):
             os.makedirs(save_directory)
@@ -83,9 +84,12 @@ def test_model(algorithm, adversary_tactic, model_directory, environments_direct
 if __name__ == "__main__":
     
     algo = 'dqn'
-    model_dir = 'defense_params_dqn/benchmarking/071732mai2022step_0'
-    env_dir = 'eval_lib'
-    nb_ep = 3
-    adversary_type = 'random'
+    plaindqn = 'results/plaindqn/100238mai2022step_300000'
+    plaindqnconv = 'results/plaindqnconv/102226mai2022step_300000/'
+    ddqn_conv = 'results/dqn_conv_double/122032mai2022step_300000/'
+    env_dir = 'eval_lib_fixedObs3'
+    nb_ep = 50
+    adversary_random = 'random'
     #model_dir = 'random'
-    out = test_model(algo, adversary_type,  model_dir, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'eval_libtest1')
+    out = test_model(algo, adversary_random,  plaindqn, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'eval_plaindqn')
+    #out = test_model(algo, adversary_random,  plaindqnconv, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'eval_plaindqnconv')
