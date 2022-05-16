@@ -353,6 +353,7 @@ class Runner:
                     self.online_nets[agent].net.load_state_dict(torch.load(agent_model))
             with open(f'{dir}/loading_parameters.bin',"rb") as f:
                 self.loading_parameters = pickle.load(f)
+            self.args.ITER_START_STEP = self.loading_parameters.step
             try:  #for previous version compatibility
                 self.blue_team_buffers = self.loading_parameters.blue_team_buffers
             except:
