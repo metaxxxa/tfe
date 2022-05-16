@@ -336,6 +336,7 @@ class Runner:
             os.makedirs(dirname_agents)
         for agent in self.args.blue_agents:
                 torch.save(self.online_nets[agent].net.state_dict(),  dirname_agents   + agent + '.pt')
+                torch.save(self.online_nets[agent].net.state_dict(),  dirname_agents + 'target_'   + agent + '.pt')
         with open(f'{dirname}/loading_parameters.bin',"wb") as f:
             pickle.dump(params, f)
 
@@ -343,6 +344,7 @@ class Runner:
         if red:
             for index in range(len(self.args.blue_agents)):
                 agent_model = dir + '/agent_dqn_params/' + self.args.blue_agents[index] +'.pt'
+                target_model = dir + '/agent_dqn_params/' + 'target_' + self.args.blue_agents[index] +'.pt'
                 self.adversary_nets[self.args.red_agents[index]].net.load_state_dict(torch.load(agent_model))
             with open(f'{dir}/loading_parameters.bin',"rb") as f:
                 self.loading_parameters = pickle.load(f)
@@ -351,6 +353,10 @@ class Runner:
             for agent in self.args.blue_agents:
                     agent_model = dir + '/agent_dqn_params/' + agent +'.pt'
                     self.online_nets[agent].net.load_state_dict(torch.load(agent_model))
+                    try:
+                        self.target_nets[agent].net.load_state_dict(torch.load(target_model))
+                    except:
+                        self.target_nets[agent].net.load_state_dict(torch.load(agent_model))
             with open(f'{dir}/loading_parameters.bin',"rb") as f:
                 self.loading_parameters = pickle.load(f)
             self.args.ITER_START_STEP = self.loading_parameters.step

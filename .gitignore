@@ -13,6 +13,4 @@ evals
 figures
 graphs
 defense_params_dqn
-defense_params_qmix
-defense_params_vdn
 results
