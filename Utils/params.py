@@ -57,7 +57,7 @@ class DQNArgs:
         self.TENSORBOARD = True
         self.REW_BUFFER_SIZE = 10000
         #save and reload model
-        self.SAVE_CYCLE = 50000
+        self.SAVE_CYCLE = 20000
         self.MODEL_DIR = 'defense_params_dqn'
         self.RUN_NAME = 'benchmarking'
         self.ITER_START_STEP = 0 #when starting training with an already trained model
