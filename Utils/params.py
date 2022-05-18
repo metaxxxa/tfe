@@ -10,8 +10,8 @@ class DQNArgs:
     def __init__(self, env):
         self.ALGO = 'dqn'
         self.device = get_device()
-        self.ENV_FOLDER = 'training_lib'
-        self.CHANGE_ENV = True
+        self.ENV_FOLDER = ''
+        self.CHANGE_ENV = False
         self.BUFFER_SIZE = 2000
         self.LEARNING_RATE = 1e-4
         self.MIN_BUFFER_LENGTH = 300

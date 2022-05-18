@@ -87,9 +87,15 @@ if __name__ == "__main__":
     plaindqn = 'results/plaindqn/100238mai2022step_300000'
     plaindqnconv = 'results/plaindqnconv/102226mai2022step_300000/'
     ddqn_conv = 'results/dqn_conv_double/122032mai2022step_300000/'
+    ddqn_conv_annealing = 'results/dqn_conv_double_PER_annealing/131520mai2022step_100000'
+
+    CE_dqn_plain = 'results/change_env/plain/dqn/170118mai2022step_220000/'
+
     env_dir = 'eval_lib_fixedObs3'
+    final_eval_lib = 'eval_lib'
     nb_ep = 50
     adversary_random = 'random'
     #model_dir = 'random'
-    out = test_model(algo, adversary_random,  plaindqn, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'eval_plaindqn')
-    #out = test_model(algo, adversary_random,  plaindqnconv, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'eval_plaindqnconv')
+    #out = test_model(algo, adversary_random,  plaindqn, env_dir, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'eval_plaindqn')
+    out = test_model(algo, adversary_random,  CE_dqn_plain, final_eval_lib, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/change_env/plain/dqn/dqn_plain_evallib')
+

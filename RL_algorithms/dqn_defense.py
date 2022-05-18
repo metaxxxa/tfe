@@ -32,10 +32,10 @@ from Utils.params import DQNArgs as Args
 device = get_device() #get cuda if available
 #environment constants
 constants = Constants()
-TERRAIN = 'benchmark_10x10_1v1'
+TERRAIN = 'benchmark_10x10_2v2'
 TERRAIN_SIZE = 10
 MODEL_DIR = 'defense_params_dqn'
-RUN_NAME = 'benchmarking'
+RUN_NAME = 'benchmarking2'
 ADVERSARY_TACTIC = 'random'
 ENV_SIZE = 10 #todo : calculate for dqn class
 
@@ -185,18 +185,18 @@ class Runner:
         for agent in self.env.agents:
             
             if self.is_opposing_team(agent):
-                pass
-                # if self.opposing_team_buffers.action[agent] == None:
-                #     self.opposing_team_buffers.action[agent] = -1
-                #     reward = 0
-                #     done = True
-                # else:
-                #     reward = self.env._cumulative_rewards[agent]
-                #     done = self.env.dones[agent]
-                # self.opposing_team_buffers.observation_next[agent] = self.observe(agent)
-                # self.opposing_team_buffers.episode_reward += reward
-                # #store transition ?
-                # self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
+                
+                if self.opposing_team_buffers.action[agent] == None:
+                    self.opposing_team_buffers.action[agent] = -1
+                    reward = 0
+                    done = True
+                else:
+                    reward = self.env._cumulative_rewards[agent]
+                    done = self.env.dones[agent]
+                self.opposing_team_buffers.observation_next[agent] = self.observe(agent)
+                self.opposing_team_buffers.episode_reward += reward
+                #store transition ?
+                self.opposing_team_buffers.observation[agent] = self.opposing_team_buffers.observation_next[agent]
             else:
                 if self.blue_team_buffers.action[agent] == None:
                     self.blue_team_buffers.action[agent] = -1
@@ -235,6 +235,24 @@ class Runner:
         else:
             return random.sample(self.blue_team_buffers.replay_buffer, self.args.BATCH_SIZE)
     
+    def sample_multiagent(self, agent):
+        if self.args.USE_PER:
+
+            priorities = np.asarray(self.blue_team_buffers.priority)
+            self.index = np.random.choice(range(len(self.blue_team_buffers.replay_buffer)), self.args.BATCH_SIZE, p=(priorities/sum(priorities)))
+            self.weights = np.asarray([self.blue_team_buffers.weights[i] for i in self.index])
+            return [self.blue_team_buffers.replay_buffer[i] for i in self.index]
+        else:
+            temp = []
+            for transition in self.blue_team_buffers.replay_buffer:
+                if agent in transition.keys():
+                    temp.append(transition)
+                x =self.args.BATCH_SIZE
+                if len(temp) < self.args.BATCH_SIZE:
+                    x = len(temp)
+            return random.sample(temp, x)
+    
+
     def update_priorities(self, error):
         for i, index in enumerate(self.index):
             self.blue_team_buffers.priority[index] = (self.args.EPSILON_PER + error[i].item())**self.args.ALPHA_PER
@@ -462,7 +480,9 @@ class Runner:
             loss_sum = 0
             for agent in self.args.blue_agents: #in case we use IDQN
         
-                
+                if len(self.args.blue_agents)>1:
+                    transitions = self.sample_multiagent(agent)
+
                 obses = np.asarray([t[agent][0]['obs'] for t in transitions])
                 actions = np.asarray([t[agent][1] for t in transitions])
                 rews = np.asarray([ t[agent][2] for t in transitions])

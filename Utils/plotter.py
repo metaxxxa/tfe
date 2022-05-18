@@ -33,8 +33,7 @@ def plot_eval(result_file):
     plt.show(block=False)
     plt.pause(10)
 
-def plot_eval_folder(resultfile, plot_folder, base_env, name, figure_name, names=[], size=(10,5)):
-    filter_factor = 1
+def plot_eval_folder(resultfile, plot_folder, base_env, name, figure_name, names=[], show_var='', filter_factor=1, training_plot=False, size=(10,5)):
 
 
     
@@ -53,16 +52,24 @@ def plot_eval_folder(resultfile, plot_folder, base_env, name, figure_name, names
             plt.plot(x,  uniform_filter1d(y, size=filter_factor), color= COLORS[i], label=names[i])
         else:
             plt.plot(x,  uniform_filter1d(y, size=filter_factor), color= COLORS[i])
-        plt.errorbar(x, uniform_filter1d(y, size=filter_factor), yerr=var, fmt='o', ecolor=COLORS[i], color='white')
+        if show_var == 'error bars':
+            plt.errorbar(x, uniform_filter1d(y, size=filter_factor), yerr=var, fmt='o', ecolor=COLORS[i], color='white')
+        elif show_var == 'interval':
+            new_step, std_up, std_down = compute_variance(x, uniform_filter1d(y, size=filter_factor), 20)
+            plt.fill_between(new_step, std_down, std_up, color=COLORS[i] , alpha=0.1)
+
         i += 1
     plt.legend()
     plt.xlabel('Similarity Index')
     plt.ylabel('Reward /agent')
-    plt.title(f'Reward for {figure_name} trained on {base_env}')
+    if training_plot:
+        plt.title(f'Reward per episode for {figure_name} trained on {base_env}')
+    else:
+        plt.title(f'Reward per episode for {figure_name}')
     plt.show(block=False)
     plt.pause(1)
     
-    plt.savefig(f'{folder_name}/reward_plot.png')
+    plt.savefig(f'{folder_name}/{figure_name}_reward_plot.png', bbox_inches='tight')
     plt.close()
     i= 0
     for file in resultfile:
@@ -74,37 +81,51 @@ def plot_eval_folder(resultfile, plot_folder, base_env, name, figure_name, names
             plt.plot(x,  uniform_filter1d(y, size=filter_factor), color=COLORS[i], label=names[i])
         else:
             plt.plot(x,  uniform_filter1d(y, size=filter_factor), color=COLORS[i])
-        plt.errorbar(x, uniform_filter1d(y, size=filter_factor), yerr=var, fmt='o', ecolor=COLORS[i], color='white')
+        if show_var == 'error bars':
+            plt.errorbar(x, uniform_filter1d(y, size=filter_factor), yerr=var, fmt='o', ecolor=COLORS[i], color='white')
+        elif show_var == 'interval':
+            new_step, std_up, std_down = compute_variance(x, uniform_filter1d(y, size=filter_factor), 20)
+            plt.fill_between(new_step, std_down, std_up, color=COLORS[i] , alpha=0.1)
         i += 1
     plt.legend()
     plt.xlabel('Similarity Index')
     plt.ylabel('Steps /episode')
-    plt.title(f'Steps per episode for {figure_name} trained on {base_env}')
+    if training_plot:
+        plt.title(f'Steps per episode for {figure_name} trained on {base_env}')
+    else:
+        plt.title(f'Steps per episode for {figure_name}')
     plt.show(block=False)
     plt.pause(1)
-    plt.savefig(f'{folder_name}/steps_plot.png')
+    plt.savefig(f'{folder_name}/{figure_name}_steps_plot.png', bbox_inches='tight')
     plt.close()
     i= 0
+    filter_factor = round(filter_factor/10)
     for file in resultfile:
         similarity_index, reward, steps, wins, nb_episodes, reward_v, steps_v, wins_v = compute_results(file)
 
-        sim_index = similarity_index
-        w = wins
         x, y = zip(*sorted(zip(similarity_index, wins)))
         _, var = zip(*sorted(zip(similarity_index, wins_v)))
         if len(names) != 0:
             plt.plot(x,  uniform_filter1d(y, size=filter_factor), label=names[i], color=COLORS[i])
         else:
             plt.plot(x,  uniform_filter1d(y, size=filter_factor), color=COLORS[i])
-        plt.errorbar(x, uniform_filter1d(y, size=filter_factor), yerr=var, fmt='o', ecolor=COLORS[i], color='white')
+        if show_var == 'error bars':
+            plt.errorbar(x, uniform_filter1d(y, size=filter_factor), yerr=var, fmt='o', ecolor=COLORS[i], color='white')
+        elif show_var == 'interval':
+            new_step, std_up, std_down = compute_variance(x, uniform_filter1d(y, size=filter_factor), 20)
+            plt.fill_between(new_step, std_down, std_up, color=COLORS[i] , alpha=0.1)
         i +=1 
     plt.legend()
     plt.xlabel('Similarity Index')
+    plt.yticks([0, 0.25, 0.5, 0.75, 1])
     plt.ylabel('Win rate')
-    plt.title(f'Win rate for {figure_name} trained on {base_env}')
+    if training_plot:
+        plt.title(f'Win rate per episode for {figure_name} trained on {base_env}')
+    else:
+        plt.title(f'Win rate per episode for {figure_name}')
     plt.show(block=False)
     plt.pause(1)
-    plt.savefig(f'{folder_name}/wins_plot.png')
+    plt.savefig(f'{folder_name}/{figure_name}_wins_plot.png', bbox_inches='tight')
     plt.close()
 
 
@@ -237,7 +258,7 @@ def compute_variance(steps, data, window=15):
     Z = 10 #80 % confidence interval
     for i in range(int(np.floor((len(data)-1)/window))+1):
         segment = data[i*window:((i+1)*window -1)]
-        ci = np.std(segment)*5
+        ci = Z*np.std(segment)/math.sqrt(len(segment))
         std_up.append(data[i*window+int(np.floor((len(segment)-1)/2))] +ci )
         std_down.append(data[i*window+int(np.floor((len(segment)-1)/2))] - ci)
         new_step.append((steps[i*window+int(np.floor((len(segment)-1)/2))]))
@@ -250,11 +271,12 @@ if __name__ == "__main__":
     plain_dqn = 'eval_plaindqn3/results_dqn_eval_lib_fixedObs3_100238mai2022step_300000.bin'
     plain_dqn_conv = 'eval_plaindqnconv/results_dqn_eval_lib_fixedObs3_.bin'
     #plain_dqn = 'test/results_dqn_eval_lib_fixedObs3_100238mai2022step_300000.bin'
-
-    x = 'eval_plaindqn/results_dqn_eval_lib_fixedObs2_100238mai2022step_300000.bin'
-    plot_eval_folder([plain_dqn, plain_dqn_conv], 'results/plaindqn', 'benchmark10_1v1', 'test_trained_sameEnv', 'Plain DQN', ['Basic DQN', 'Conv DQN'])
- 
- #   plot_eval_folder([x], 'results/plaindqn', 'benchmark10_1v1', 'test_trained_sameEnv', 'Plain DQN', ['Basic DQN'])
+    plaindqnconv = 'results/plaindqnconv/evallib_plaindqnconv/results_dqn_eval_lib_.bin'
+    ddqn_conv_PERanneal = 'results/dqn_conv_double_PER_annealing/evallib_ddqnconv_anneal/results_dqn_eval_lib_131520mai2022step_100000.bin'
+    test_dqn_evallib = [plaindqnconv, ddqn_conv_PERanneal]
+ #   plot_eval_folder([plain_dqn, plain_dqn_conv], 'results/plaindqn', 'benchmark terrain', 'test_trained_sameEnv', 'Plain DQN', ['Basic DQN', 'Conv DQN'])
+    names = ['DQN trained on benchmark', 'PER DDQN trained on benchmark']
+    plot_eval_folder(test_dqn_evallib, 'figures', 'benchmark', 'res_comp', 'Conv DQN', names, 'interval', 100)
  
     # plot_eval_folder(test, 'testfolderplot', 'benchmark10_1v1', 'firstjet')
     # qmixloss_benchmark = 'toplot/Apr12_16-18-44_qmix_log.json'
@@ -281,8 +303,35 @@ if __name__ == "__main__":
     json_dqn_wins = ['results/plaindqn/tensorboard_data/run-mai09_22-51-32_DeathStar-tag-Win.json', 'results/plaindqnconv/tensorboard_data/run-mai10_15-06-41_DeathStar-tag-Win.json',  'results/dqn_conv_double/tensorboard_data/run-mai12_10-43-27_DeathStar-tag-Win.json', 'results/dqnconv_PER_double/tensorboard_data/run-mai11_23-38-06_DeathStar-tag-Win.json'
 , 'results/dqn_conv_double_PER_annealing/tensorboard_data/run-mai13_11-58-36_DeathStar-tag-Win.json']
     
-
+    dqn_cE_Loss = ['results/change_env/plain/dqn/run-May16_00-17-42_DeathStar-tag-Loss _agent.json']
     
+    dqn_cE_Steps = ['results/change_env/plain/dqn/run-May16_00-17-42_DeathStar-tag-Steps.json']
+    
+    dqn_cE_Reward = ['results/change_env/plain/dqn/run-May16_00-17-42_DeathStar-tag-Reward.json']
+    
+    dqn_cE_Win = ['results/change_env/plain/dqn/run-May16_00-17-42_DeathStar-tag-Win.json']
+    
+
+    qmix_plain_Loss =  'results/qmix/plain/tensorboard_data/run-mai10_22-59-13_DeathStar-tag-Loss.json'
+    qmix_plain_Steps =  'results/qmix/plain/tensorboard_data/run-mai10_22-59-13_DeathStar-tag-Steps.json'
+    qmix_plain_Wins =  'results/qmix/plain/tensorboard_data/run-mai10_22-59-13_DeathStar-tag-Wins.json'
+    qmix_plain_Reward =  'results/qmix/plain/tensorboard_data/run-mai10_22-59-13_DeathStar-tag-Reward.json'
+
+    qmixvdn_plain_Loss = [qmix_plain_Loss]
+    qmixvdn_plain_Steps = [qmix_plain_Steps]
+    qmixvdn_plain_Reward= [qmix_plain_Reward]
+    qmixvdn_plain_Wins = [qmix_plain_Wins]
+
+    names = ['Plain QMIX']
+    plot_tensorboard_compare(qmixvdn_plain_Loss, names, 'loss', 'qmix', 'changing', 'base/qmix_vdn_compare_Loss')
+
+    plot_tensorboard_compare(qmixvdn_plain_Steps, names, 'steps /episode', 'qmix', 'changing', 'base/qmix_vdn_compare_Steps')
+
+    plot_tensorboard_compare(qmixvdn_plain_Reward, names, 'reward', 'qmix', 'changing', 'base/qmix_vdn_compare_Reward')
+
+    plot_tensorboard_compare(qmixvdn_plain_Wins, names, 'win rate', 'qmix', 'changing', 'base/qmix_vdn_compare_Wins')
+
+
     names = ['Plain DQN', 'Conv DQN', 'Conv DDQN', 'Conv DDQN PER', 'Conv DDQN PER with annealing']
  #   plot_tensorboard_compare(json_dqn_loss, names, 'loss', 'dqn', 'benchmark', 'benchmark/dqn_compare_loss')
 
@@ -292,3 +341,12 @@ if __name__ == "__main__":
  #   plot_tensorboard_compare(json_dqn_steps, names, 'steps /episode', 'dqn', 'benchmark', 'benchmark/dqn_compare_steps')
 
   #  plot_tensorboard_compare(json_dqn_wins, names, 'win rate', 'dqn', 'benchmark', 'benchmark/dqn_compare_wins')
+
+    names = ['Plain DQN']
+    plot_tensorboard_compare(dqn_cE_Loss, names, 'loss', 'dqn', 'changing', 'changing_environments/dqnCE_compare_loss')
+
+    plot_tensorboard_compare(dqn_cE_Steps, names, 'steps /episode', 'dqn', 'changing', 'changing_environments/dqnCE_compare_steps')
+
+    plot_tensorboard_compare(dqn_cE_Reward, names, 'reward', 'dqn', 'changing', 'changing_environments/dqnCE_compare_reward')
+
+    plot_tensorboard_compare(dqn_cE_Win, names, 'win rate', 'dqn', 'changing', 'changing_environments/dqnCE_compare_wins')

@@ -86,7 +86,7 @@ def generate_eval_lib(size, nb_agents, base_terrain, nb_env, folder, tolerance=0
 
 
     steps = 3
-    utilities.load_terrain(base_terrain)
+    base_terrain = utilities.load_terrain(base_terrain)
     while len(similarity_index) > 0:
         
         for i in 0.3**np.linspace(5,1,steps):  #high number of obstacles directly lead to more environments in the small similarity index range
@@ -149,8 +149,8 @@ if __name__ == "__main__":
     
     #generate_library(10, 1, 'benchmark_10x10_1v1', 10, 'training_lib')
 
-    #generate_eval_lib(10, 1,base, 500, 'eval_lib')
-    gen_lib_fixedObs(10, 1,base, 10, 'eval_lib_fixedObs3')
+    generate_eval_lib(10, 1,base, 250, 'eval_lib')
+    #gen_lib_fixedObs(10, 1,base, 200, 'eval_lib_fixedObs2')
     
 
   #  utilities.write_terrain('test', f'ondiff_ind={index}', t)
