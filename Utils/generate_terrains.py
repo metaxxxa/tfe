@@ -8,6 +8,7 @@ sys.path.insert(0, '/home/jack/Documents/ERM/Master thesis/tfe')
 from env import utilities
 import helper
 
+LINES = True
 
 def generate_random(size, nb_agents, obstacles_random_factor):
     nb_obstacles = round(obstacles_random_factor*size**2)
@@ -142,15 +143,15 @@ if __name__ == "__main__":
         utilities.write_terrain('testt', f'test_terrain{i}', generate_random(8,1, 0.1))
     base= 'benchmark_10x10_1v1'
     index = 3
-    lines = False
+    lines = True
     window = 3
     for i in range(1,6):
         print(helper.similarity_index(base, f'test/sim{i}_', lines, window))
     
     #generate_library(10, 1, 'benchmark_10x10_1v1', 10, 'training_lib')
 
-    generate_eval_lib(10, 1,base, 250, 'eval_lib')
-    #gen_lib_fixedObs(10, 1,base, 200, 'eval_lib_fixedObs2')
+    #generate_eval_lib(10, 1,base, 250, 'eval_lib_lines', lines=lines)
+    gen_lib_fixedObs(10, 1,base, 11, 'eval_lib_fixedObs_lines')
     
 
   #  utilities.write_terrain('test', f'ondiff_ind={index}', t)

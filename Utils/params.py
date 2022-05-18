@@ -13,7 +13,7 @@ class DQNArgs:
         self.ENV_FOLDER = ''
         self.CHANGE_ENV = False
         self.BUFFER_SIZE = 2000
-        self.LEARNING_RATE = 1e-4
+        self.LEARNING_RATE = 1e-5
         self.MIN_BUFFER_LENGTH = 300
         self.BATCH_SIZE = 64
         self.GAMMA = 0.9
@@ -23,11 +23,11 @@ class DQNArgs:
         self.SYNC_TARGET_FRAMES = 200
         self.STOP_TRAINING = self.EPSILON_DECAY*3
         self.RNN = False
-        self.USE_PER = False
+        self.USE_PER = True
         self.EPSILON_PER = 0.0001
         self.ALPHA_PER_START = 0.6
         self.B_PER_START = 0.4
-        self.DOUBLE_DQN = False 
+        self.DOUBLE_DQN = True 
         self.CONVOLUTIONAL_INPUT = True
         #convolutional parameters
         self.CONV_OUT_CHANNELS = 16

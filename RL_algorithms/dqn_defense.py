@@ -32,7 +32,7 @@ from Utils.params import DQNArgs as Args
 device = get_device() #get cuda if available
 #environment constants
 constants = Constants()
-TERRAIN = 'benchmark_10x10_2v2'
+TERRAIN = 'benchmark_10x10_1v1'
 TERRAIN_SIZE = 10
 MODEL_DIR = 'defense_params_dqn'
 RUN_NAME = 'benchmarking2'
@@ -573,7 +573,7 @@ class Runner:
                     if self.is_opposing_team(agent):
                         self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
                         action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
-                        
+                        self.opposing_team_buffers.action[agent] = action
                     else:
                         self.blue_team_buffers.observation[agent], _, done, _ = self.last()
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
@@ -613,6 +613,7 @@ class Runner:
                     if self.is_opposing_team(agent):
                         self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
                         action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
+                        self.opposing_team_buffers.action[agent] = action
                         
                     else:
                         self.blue_team_buffers.observation[agent], _, done, _ = self.last()
