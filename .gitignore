@@ -17,3 +17,12 @@ defense_params_dqn/
 defense_params_qmix/
 defense_params_vdn/
 results/
+eval_plaindqn/
+eval_plaindqn3/
+eval_plaindqnconv/
+evallib_ddqnconv_anneal/
+evallib_plaindqnconv/
+temp
+test/
+run_dqn_eval.sh
+run_dqn_gen.sh
