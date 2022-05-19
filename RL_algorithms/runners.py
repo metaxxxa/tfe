@@ -122,7 +122,7 @@ class Runner:
         observation = copy.deepcopy(self.env.observe(agent))
         
         if self.args.CONVOLUTIONAL_INPUT:
-            observation['obs'] = helper.obs_to_convInput(observation, self.args.ENV_SIZE, self.env.env.max_num_agents)
+            observation['obs'] = helper.obs_to_convInput(observation, self.args.ENV_SIZE, self.env.env.max_num_agents, self.args.PARTIALLY_OBSERVABLE)
         return observation
 
     def last(self):
@@ -260,7 +260,7 @@ class Runner:
     def save_model(self, train_step):  #taken from https://github.com/koenboeckx/qmix/blob/main/qmix.py to save learnt model
 
         params = Params(train_step)
-        params.blue_team_replay_buffer = self.blue_team_buffers.replay_buffer
+        params.blue_team_buffers = self.blue_team_buffers
         if self.args.RUN_NAME != '':
             dirname = self.args.MODEL_DIR + '/' + self.args.RUN_NAME + '/' +datetime.now().strftime("%d%H%M%b%Y") + f'step_{train_step}'
         else:
@@ -298,18 +298,19 @@ class Runner:
         else:
             self.online_net.load_state_dict(torch.load(mixer_model))
             self.target_net.load_state_dict(torch.load(target_model))
-            if self.args.COMMON_AGENTS_NETWORK:
-                agent_model = dir + '/agents_net_params.pt'
-                self.adversary_net.agents_net.load_state_dict(torch.load(agent_model))
-                for agent in self.args.blue_agents:
-                    self.agents_nets[agent] = self.agents_net
-            else:
-                for agent in self.args.blue_agents:
+            if self.args.ADVERSARY_TACTIC == 'qmix':
+                for agent in self.args.red_agents:
                     agent_model = dir + '/agent_nets_params/' + agent +'.pt'
-                    self.online_net.agents_nets[agent].load_state_dict(torch.load(agent_model))
+                    self.adversary_net.agents_nets[agent].load_state_dict(torch.load(agent_model))
+            for agent in self.args.blue_agents:
+                agent_model = dir + '/agent_nets_params/' + agent +'.pt'
+                self.online_net.agents_nets[agent].load_state_dict(torch.load(agent_model))
             with open(f'{dir}/loading_parameters.bin',"rb") as f:
                 self.loading_parameters = pickle.load(f)
-            self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
+            try:
+                self.blue_team_buffers = self.loading_parameters.blue_team_buffers
+            except: 
+                self.blue_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
 
     def train(self, step):
           
@@ -509,7 +510,7 @@ class Runner:
     
         ###
 
-    def eval(self, params_directory, nb_episodes=10000, visualize = True, log = True):
+    def eval(self, params_directory, nb_episodes=200, visualize = False, log = True):
         results = Metrics(nb_episodes)
         self.env.reset()
         self.reset_buffers()
@@ -524,36 +525,78 @@ class Runner:
         for _ in itertools.count(start=self.args.ITER_START_STEP):
             if ep_counter == nb_episodes:
                 break
-            
+
+
+            """
+            for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
+                
+                if self.is_opposing_team(agent):
+                    self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
+                    action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
+                    if done:
+                        action = None
+                    self.opposing_team_buffers.action[agent] = action
+                    
+                    
+                else:
+                    self.blue_team_buffers.observation[agent], _, done, _ = self.last()
+                    action, self.blue_team_buffers.hidden_state_next[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
+                    if rnd_sample <= epsilon and self.args.GREEDY:
+                        action = self.random_action(agent, self.blue_team_buffers.observation[agent])
+                    if done:
+                        action = None
+                    self.blue_team_buffers.action[agent] = action
+                self.env.step(action)
+                
+                self.visualize()
+            self.update_buffer()
+            """
             self.step_buffer()
             for agent in self.env.agent_iter(max_iter=len(self.env.agents)):
                 
                 if self.is_opposing_team(agent):
                     self.opposing_team_buffers.observation[agent], _, done, _ = self.last()
                     action = self.adversary_tactic(agent, self.opposing_team_buffers.observation[agent])
-                   
+                    if done:
+                        action = None
+                    self.opposing_team_buffers.action[agent] = action
                     
                 else:
                     self.blue_team_buffers.observation[agent], _, done, _ = self.last()
+                    action, self.blue_team_buffers.hidden_state_next[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
+                    
                     if randomtest:
                         action = self.random_action(agent, self.blue_team_buffers.observation[agent])
                     else:
                         action, self.blue_team_buffers.hidden_state_next[agent] = self.online_net.act(agent, self.blue_team_buffers.observation[agent], self.blue_team_buffers.hidden_state[agent])
 
-                if done:
-                    action = None
+                    if done:
+                        action = None
                     
+                    self.blue_team_buffers.action[agent] = action
                 self.env.step(action)
-                print(f'{agent} : {action}')
-                self.env.render()
-                #time.sleep(self.args.WAIT_BETWEEN_STEPS)
-                self.update_buffer(agent, action)
-            ep_counter += 1
+                #print(f'{agent} : {action}')
+                if visualize:
+                    self.env.render()
+                    #time.sleep(self.args.WAIT_BETWEEN_STEPS)
+            self.update_buffer()
+            
             if all(x == True for x in self.env.dones.values()):  #if all agents are done, episode is done, -> reset the environment
-        
+                ep_counter += 1
                 self.blue_team_buffers.episode_reward = self.blue_team_buffers.episode_reward/(self.args.n_blue_agents)
                 self.blue_team_buffers.rew_buffer.append(self.blue_team_buffers.episode_reward)
+
+                results.rewards_buffer.append(self.blue_team_buffers.episode_reward)
+                results.nb_steps.append(self.blue_team_buffers.nb_transitions)
+                results.wins.append(self.winner_is_blue())
                 self.env.reset()
-                print(f'Episode reward /agent: {self.blue_team_buffers.episode_reward}')
+                if log:
+                    print(f'Episode reward /agent: {self.blue_team_buffers.episode_reward}')
+                    print(f'Episode steps: {self.blue_team_buffers.nb_transitions}')
                 self.reset_buffers()
+        
+        if log:
+            print(f'Mean reward per episode: {np.mean(results.rewards_buffer)}')
+            print(f'Mean steps per episode: {np.mean(results.nb_steps)}')
+            print(f'Mean win rate: {sum(results.wins)/nb_episodes}')
         return results

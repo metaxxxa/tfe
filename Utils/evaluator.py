@@ -88,7 +88,7 @@ if __name__ == "__main__":
     plaindqnconv = 'results/plaindqnconv/102226mai2022step_300000/'
     ddqn_conv = 'results/dqn_conv_double/122032mai2022step_300000/'
     ddqn_conv_annealing = 'results/dqn_conv_double_PER_annealing/131520mai2022step_100000'
-
+    ddqn_conv_annealing = 'results/dqn_conv_double_PER_annealing/dqn_enhanced/190322May2022step_300000'
     CE_dqn_plain = 'results/change_env/plain/dqn/170118mai2022step_220000/'
     CE_dqn_features = 'results/change_env/with_features/dqn/180810May2022step_300000'
     env_dir = 'eval_lib_fixedObs3'
@@ -101,8 +101,8 @@ if __name__ == "__main__":
     #model_dir = 'random'
   #  out = test_model(algo, adversary_random,  plaindqn, small_evallib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/plaindqn/small_evallib_lines')
  #   out = test_model(algo, adversary_random,  plaindqnconv, small_evallib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/plaindqnconv/small_evallib_lines')
-    #out = test_model(algo, adversary_random,  plaindqnconv, final_eval_lib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/plaindqnconv/evallib_lines')
-    out = test_model(algo, adversary_random,  CE_dqn_plain, final_eval_lib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/change_env/plain/dqn/dqn_plain_evallib_lines')
- #   out = test_model(algo, adversary_random,  ddqn_conv_annealing, final_eval_lib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/dqn_conv_double_PER_annealing/evallib_lines')
-  #  out = test_model(algo, adversary_random,  CE_dqn_features, final_eval_lib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/change_env/with_features/dqn/evallib_lines')
+ #   out = test_model(algo, adversary_random,  plaindqnconv, final_eval_lib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/plaindqnconv/evallib_lines')
+  #  out = test_model(algo, adversary_random,  CE_dqn_plain, final_eval_lib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/change_env/plain/dqn/dqn_plain_evallib_lines')
+    out = test_model(algo, adversary_random,  ddqn_conv_annealing, final_eval_lib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/dqn_conv_double_PER_annealing/dqn_enhanced/evallib_lines')
+    #out = test_model(algo, adversary_random,  CE_dqn_features, final_eval_lib_lines, nb_ep, EPISODE_MAX_LENGTH, MAX_DISTANCE, 'results/change_env/with_features/dqn/evallib_lines')
 

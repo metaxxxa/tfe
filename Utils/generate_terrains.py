@@ -151,7 +151,7 @@ if __name__ == "__main__":
     #generate_library(10, 1, 'benchmark_10x10_1v1', 10, 'training_lib')
 
     #generate_eval_lib(10, 1,base, 250, 'eval_lib_lines', lines=lines)
-    gen_lib_fixedObs(10, 1,base, 11, 'eval_lib_fixedObs_lines')
+    #gen_lib_fixedObs(10, 1,base, 11, 'eval_lib_fixedObs_lines')
     
 
   #  utilities.write_terrain('test', f'ondiff_ind={index}', t)

@@ -167,7 +167,7 @@ class Runner:
         observation = copy.deepcopy(self.env.observe(agent))
         
         if self.args.CONVOLUTIONAL_INPUT:
-            observation['obs'] = helper.obs_to_convInput(observation, self.env_size, self.env.env.max_num_agents)
+            observation['obs'] = helper.obs_to_convInput(observation, self.env_size, self.env.env.max_num_agents, self.args.PARTIALLY_OBSERVABLE)
         return observation
     
     def last(self):
@@ -699,4 +699,5 @@ if __name__ == "__main__":
     # args_runner.RUN_NAME = RUN_NAME
     # args_runner.ADVERSARY_TACTIC = ADVERSARY_TACTIC
     # runner = Runner(env, args_runner)
-    # runner.eval('defense_params_dqn/benchmarking/151503mai2022step_50000/')
+    # eval_model = 'results/dqn_conv_double_PER_annealing/dqn_enhanced/2agents_model'
+    # runner.eval(eval_model)

@@ -75,6 +75,7 @@ class DQNArgs:
         self.OPPOSING_TEAM = 'red'
         self.ADVERSARY_TACTIC = 'random'
         self.ADVERSARY_MODEL = ''
+        self.PARTIALLY_OBSERVABLE = False
         self.params(env)
 
     def params(self, env):  #environment specific parameters calculation
@@ -155,7 +156,7 @@ class QMIXArgs:
         #saving models
         self.ITER_START_STEP = 0 #when starting training with an already trained model, 0 by default without model to load
         self.MODEL_TO_LOAD = ''
-        self.SAVE_CYCLE = 100000
+        self.SAVE_CYCLE = 25000
         self.MODEL_DIR = 'defense_params_qmix'
         self.RUN_NAME = 'benchmarking'
         #agent network parameters
@@ -174,6 +175,7 @@ class QMIXArgs:
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
         self.ADVERSARY_TACTIC = 'random'
+        self.PARTIALLY_OBSERVABLE = False
         self.params(env)
 
     def params(self, env):  #environment specific parameters calculation
@@ -215,7 +217,7 @@ class VDNArgs:
         self.GAMMA = 0.9
         self.EPSILON_START = 1
         self.EPSILON_END = 0.01
-        self.EPSILON_DECAY = 100000
+        self.EPSILON_DECAY = 50000
         self.SYNC_TARGET_FRAMES = 2000
         self.STOP_TRAINING = self.EPSILON_DECAY*3
         self.USE_PER = True
@@ -253,7 +255,7 @@ class VDNArgs:
         #saving models
         self.ITER_START_STEP = 0 #when starting training with an already trained model, 0 by default without model to load
         self.MODEL_TO_LOAD = ''
-        self.SAVE_CYCLE = 100000
+        self.SAVE_CYCLE = 25000
         self.MODEL_DIR = 'defense_params_vdn'
         self.RUN_NAME = 'benchmarking'
         #agent network parameters
@@ -272,6 +274,7 @@ class VDNArgs:
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
         self.ADVERSARY_TACTIC = 'random'
+        self.PARTIALLY_OBSERVABLE = False
         self.params(env)
 
     def params(self, env):  #environment specific parameters calculation

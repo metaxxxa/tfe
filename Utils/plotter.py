@@ -99,7 +99,7 @@ def plot_eval_folder(resultfile, plot_folder, base_env, name, figure_name, names
     plt.savefig(f'{folder_name}/{figure_name}_steps_plot.png', bbox_inches='tight')
     plt.close()
     i= 0
-    filter_factor = int(np.ceil(filter_factor/10))
+   # filter_factor = int(np.ceil(filter_factor/10))
     for file in resultfile:
         similarity_index, reward, steps, wins, nb_episodes, reward_v, steps_v, wins_v = compute_results(file)
 
@@ -264,10 +264,31 @@ def compute_variance(steps, data, window=15):
         new_step.append((steps[i*window+int(np.floor((len(segment)-1)/2))]))
     return new_step, std_up, std_down
 
+def plot_sim_index_repartition(env_library, name, nb_bars=10, size=(10,5)):
+    sim_index = []
+    i = 0
+    for filename in os.listdir(f'env/terrains/{env_library}'):
+        i += 1
+        sim_index_string = filename.split('simIndex_')[-1].split('_')[0]
+        if sim_index_string == 'benchmark':
+            sim_index_string = '1'
+        sim_index.append(float(sim_index_string))
 
+    fig = plt.figure(figsize=size)
+    plt.hist(sim_index, bins = np.linspace(0,1,nb_bars))
+    plt.xlabel('Similarity index')
+    plt.ylabel("N° of environments") 
+    
+    plt.title(f'Similarity index distribution of environments {name} set')
+    fig.savefig(f'figures/{name}sim_index_distrib.png', bbox_inches='tight', dpi=300)
+    plt.show(block=False)
+    plt.pause(1)
+    plt.close()
 
 if __name__ == "__main__":
     
+ #   plot_sim_index_repartition('training_lib', 'test', )
+
     plain_dqn_small_lib = 'eval_plaindqn3/results_dqn_eval_lib_fixedObs3_100238mai2022step_300000.bin'
     plain_dqn_lines_small_lib = 'results/plaindqn/small_evallib_lines/results_dqn_eval_lib_fixedObs_lines_100238mai2022step_300000.bin'
     plain_dqn_conv_small_lib = 'eval_plaindqnconv/results_dqn_eval_lib_fixedObs3_.bin'
@@ -278,15 +299,20 @@ if __name__ == "__main__":
     CE_plaindqnconvLines = 'results/change_env/plain/dqn/dqn_plain_evallib_lines/results_dqn_eval_lib_.bin'
     ddqn_conv_PERanneal = 'results/dqn_conv_double_PER_annealing/evallib_ddqnconv_anneal/results_dqn_eval_lib_131520mai2022step_100000.bin'
     ddqn_conv_PERanneal_lines = 'results/dqn_conv_double_PER_annealing/evallib_lines/results_dqn_eval_lib_lines_131520mai2022step_100000.bin'
+    ddqn_conv_PERanneal_lines = 'results/dqn_conv_double_PER_annealing/dqn_enhanced/evallib_lines/results_dqn_eval_lib_lines_190322May2022step_300000.bin'
     CE_ddqn_conv_PERanneal_lines = 'results/change_env/with_features/dqn/evallib_lines/results_dqn_eval_lib_lines_180810May2022step_300000.bin'
     
-    test_dqn_evallib = [CE_plaindqnconvLines, CE_ddqn_conv_PERanneal_lines]
+    test_dqn_evallib = [plaindqnconvLines, ddqn_conv_PERanneal_lines, CE_plaindqnconvLines, CE_ddqn_conv_PERanneal_lines]
   #  plot_eval_folder([plain_dqn_small_lib, plain_dqn_conv_small_lib], 'results/plaindqn', 'benchmark terrain', 'test_trained_sameEnv', 'Plain DQN', ['Basic DQN', 'Conv DQN'], 'error bars', 1)
  #   plot_eval_folder([plain_dqn_lines_small_lib, plain_dqn_conv_lines_small_lib], 'results/plaindqn', 'benchmark terrain', 'test_trained_sameEnv_lines', 'Plain DQN', ['Basic DQN', 'Conv DQN'], 'error bars', 1)
-    names = ['DQN trained on benchmark', 'PER DDQN trained on benchmark', 'ce p', 'ce f']
-    plot_eval_folder([plaindqnconvLines, ddqn_conv_PERanneal_lines, CE_plaindqnconvLines, CE_ddqn_conv_PERanneal_lines], 'figures', 'benchmark', 'res_comp', 'Conv DQN', names, 'interval', 50)
- 
-    plot_eval_folder(test_dqn_evallib, 'figures', 'benchmark', 'res_comp', 'Conv DQN', names, 'interval', 10)
+    
+    names = ['DQN trained on benchmark', 'PER DDQN trained on benchmark']
+    plot_eval_folder([plaindqnconvLines, ddqn_conv_PERanneal_lines], 'figures', 'benchmark', 'res_comp_dqn_benchmark', 'convolutional DQN', names, 'interval', 10)
+
+    names = ['Plain DQN trained on benchmark', 'PER DDQN trained on benchmark','Plain DQN trained on training set', 'PER DDQN trained on training set']
+    plot_eval_folder(test_dqn_evallib, 'figures', 'benchmark', 'res_comp_all_dqn', 'convolutional DQN', names, 'interval', 50)
+    names = ['Plain Conv DQN trained on training set', 'PER Conv DDQN trained on training set']
+    plot_eval_folder([CE_plaindqnconvLines, CE_ddqn_conv_PERanneal_lines], 'figures/CE_conv', 'changing', 'res_comp_dqn_CE', 'convolutional DQN', names, 'interval', 50)
  
     # plot_eval_folder(test, 'testfolderplot', 'benchmark10_1v1', 'firstjet')
     # qmixloss_benchmark = 'toplot/Apr12_16-18-44_qmix_log.json'
@@ -300,26 +326,40 @@ if __name__ == "__main__":
 
     # dqnrew_benchmark = 'toplot/avril18_21-24-37_DeathStar_dqn_rew.json'
     # plot_tensorboard_log(dqnrew_benchmark, 'reward', 'DQN', 'benchmark', 'benchmark/reward_dqn_benchmark')
+    dqn_f_Loss = 'results/dqn_conv_double_PER_annealing/tensorboard_data/run-mai13_11-58-36_DeathStar-tag-Loss _agent.json'
+    dqn_f_Loss = 'results/dqn_conv_double_PER_annealing/dqn_enhanced/run-May18_15-53-51_milleniumfalcon-tag-Loss _agent.json'
+
+    dqn_f_Steps = 'results/dqn_conv_double_PER_annealing/tensorboard_data/run-mai13_11-58-36_DeathStar-tag-Steps.json'
+    dqn_f_Steps = 'results/dqn_conv_double_PER_annealing/dqn_enhanced/run-May18_15-53-51_milleniumfalcon-tag-Steps.json'
+
+
+    dqn_f_Reward = 'results/dqn_conv_double_PER_annealing/tensorboard_data/run-mai13_11-58-36_DeathStar-tag-Reward.json'
+    dqn_f_Reward = 'results/dqn_conv_double_PER_annealing/dqn_enhanced/run-May18_15-53-51_milleniumfalcon-tag-Reward.json'
+
+
+    dqn_f_Win = 'results/dqn_conv_double_PER_annealing/tensorboard_data/run-mai13_11-58-36_DeathStar-tag-Win.json'
+    dqn_f_Win = 'results/dqn_conv_double_PER_annealing/dqn_enhanced/run-May18_15-53-51_milleniumfalcon-tag-Win.json'
+
 
     json_dqn_loss = ['results/plaindqn/tensorboard_data/run-mai09_22-51-32_DeathStar-tag-Loss _agent.json', 'results/plaindqnconv/tensorboard_data/run-mai10_15-06-41_DeathStar-tag-Loss _agent.json',  'results/dqn_conv_double/tensorboard_data/run-mai12_10-43-27_DeathStar-tag-Loss _agent.json', 'results/dqnconv_PER_double/tensorboard_data/run-mai11_23-38-06_DeathStar-tag-Loss _agent.json'
-, 'results/dqn_conv_double_PER_annealing/tensorboard_data/run-mai13_11-58-36_DeathStar-tag-Loss _agent.json']
+, dqn_f_Loss]
     
     json_dqn_reward = ['results/plaindqn/tensorboard_data/run-mai09_22-51-32_DeathStar-tag-Reward.json', 'results/plaindqnconv/tensorboard_data/run-mai10_15-06-41_DeathStar-tag-Reward.json',  'results/dqn_conv_double/tensorboard_data/run-mai12_10-43-27_DeathStar-tag-Reward.json', 'results/dqnconv_PER_double/tensorboard_data/run-mai11_23-38-06_DeathStar-tag-Reward.json'
-, 'results/dqn_conv_double_PER_annealing/tensorboard_data/run-mai13_11-58-36_DeathStar-tag-Reward.json']
+, dqn_f_Reward]
     
     json_dqn_steps = ['results/plaindqn/tensorboard_data/run-mai09_22-51-32_DeathStar-tag-Steps.json', 'results/plaindqnconv/tensorboard_data/run-mai10_15-06-41_DeathStar-tag-Steps.json',  'results/dqn_conv_double/tensorboard_data/run-mai12_10-43-27_DeathStar-tag-Steps.json', 'results/dqnconv_PER_double/tensorboard_data/run-mai11_23-38-06_DeathStar-tag-Steps.json'
-, 'results/dqn_conv_double_PER_annealing/tensorboard_data/run-mai13_11-58-36_DeathStar-tag-Steps.json']
+, dqn_f_Steps]
     
     json_dqn_wins = ['results/plaindqn/tensorboard_data/run-mai09_22-51-32_DeathStar-tag-Win.json', 'results/plaindqnconv/tensorboard_data/run-mai10_15-06-41_DeathStar-tag-Win.json',  'results/dqn_conv_double/tensorboard_data/run-mai12_10-43-27_DeathStar-tag-Win.json', 'results/dqnconv_PER_double/tensorboard_data/run-mai11_23-38-06_DeathStar-tag-Win.json'
-, 'results/dqn_conv_double_PER_annealing/tensorboard_data/run-mai13_11-58-36_DeathStar-tag-Win.json']
+, dqn_f_Win]
     
-    dqn_cE_Loss = ['results/change_env/plain/dqn/run-May16_00-17-42_DeathStar-tag-Loss_agent.json']
+    dqn_cE_Loss = ['results/change_env/plain/dqn/tensorboard_data/run-May16_00-17-42_DeathStar-tag-Loss _agent.json']
     
-    dqn_cE_Steps = ['results/change_env/plain/dqn/run-May16_00-17-42_DeathStar-tag-Steps.json']
+    dqn_cE_Steps = ['results/change_env/plain/dqn/tensorboard_data/run-May16_00-17-42_DeathStar-tag-Steps.json']
     
-    dqn_cE_Reward = ['results/change_env/plain/dqn/run-May16_00-17-42_DeathStar-tag-Reward.json']
+    dqn_cE_Reward = ['results/change_env/plain/dqn/tensorboard_data/run-May16_00-17-42_DeathStar-tag-Reward.json']
     
-    dqn_cE_Win = ['results/change_env/plain/dqn/run-May16_00-17-42_DeathStar-tag-Win.json']
+    dqn_cE_Win = ['results/change_env/plain/dqn/tensorboard_data/run-May16_00-17-42_DeathStar-tag-Win.json']
     
 
     qmix_plain_Loss =  'results/qmix/plain/tensorboard_data/run-mai10_22-59-13_DeathStar-tag-Loss.json'
@@ -333,24 +373,24 @@ if __name__ == "__main__":
     qmixvdn_plain_Wins = [qmix_plain_Wins]
 
     names = ['Plain QMIX']
-    plot_tensorboard_compare(qmixvdn_plain_Loss, names, 'loss', 'qmix', 'changing', 'base/qmix_vdn_compare_Loss')
+  #  plot_tensorboard_compare(qmixvdn_plain_Loss, names, 'loss', 'qmix', 'changing', 'base/qmix_vdn_compare_Loss')
+#
+ #   plot_tensorboard_compare(qmixvdn_plain_Steps, names, 'steps /episode', 'qmix', 'changing', 'base/qmix_vdn_compare_Steps')
 
-    plot_tensorboard_compare(qmixvdn_plain_Steps, names, 'steps /episode', 'qmix', 'changing', 'base/qmix_vdn_compare_Steps')
+  #  plot_tensorboard_compare(qmixvdn_plain_Reward, names, 'reward', 'qmix', 'changing', 'base/qmix_vdn_compare_Reward')
 
-    plot_tensorboard_compare(qmixvdn_plain_Reward, names, 'reward', 'qmix', 'changing', 'base/qmix_vdn_compare_Reward')
-
-    plot_tensorboard_compare(qmixvdn_plain_Wins, names, 'win rate', 'qmix', 'changing', 'base/qmix_vdn_compare_Wins')
+   # plot_tensorboard_compare(qmixvdn_plain_Wins, names, 'win rate', 'qmix', 'changing', 'base/qmix_vdn_compare_Wins')
 
 
     names = ['Plain DQN', 'Conv DQN', 'Conv DDQN', 'Conv DDQN PER', 'Conv DDQN PER with annealing']
- #   plot_tensorboard_compare(json_dqn_loss, names, 'loss', 'dqn', 'benchmark', 'benchmark/dqn_compare_loss')
+    plot_tensorboard_compare(json_dqn_loss, names, 'loss', 'dqn', 'benchmark', 'benchmark/dqn_compare_loss')
 
 
- #   plot_tensorboard_compare(json_dqn_reward, names, 'reward', 'dqn', 'benchmark', 'benchmark/dqn_compare_reward')
+    plot_tensorboard_compare(json_dqn_reward, names, 'reward', 'dqn', 'benchmark', 'benchmark/dqn_compare_reward')
 
- #   plot_tensorboard_compare(json_dqn_steps, names, 'steps /episode', 'dqn', 'benchmark', 'benchmark/dqn_compare_steps')
+    plot_tensorboard_compare(json_dqn_steps, names, 'steps /episode', 'dqn', 'benchmark', 'benchmark/dqn_compare_steps')
 
-  #  plot_tensorboard_compare(json_dqn_wins, names, 'win rate', 'dqn', 'benchmark', 'benchmark/dqn_compare_wins')
+    plot_tensorboard_compare(json_dqn_wins, names, 'win rate', 'dqn', 'benchmark', 'benchmark/dqn_compare_wins')
 
     names = ['Plain DQN']
     plot_tensorboard_compare(dqn_cE_Loss, names, 'loss', 'dqn', 'changing', 'changing_environments/dqnCE_compare_loss')

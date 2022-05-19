@@ -112,7 +112,7 @@ def show_terrain(terrain_name, lines=False):
     image.show()
 
 
-def obs_to_convInput(observation, env_size, max_num_agents):
+def obs_to_convInput(observation, env_size, max_num_agents, partial_obs):
     obs = np.array(observation['obs'], dtype='int')
     # 0 : obstacles
     # 1 : observing agent
@@ -138,8 +138,9 @@ def obs_to_convInput(observation, env_size, max_num_agents):
     
     for i in range(int(max_num_agents/2), int(max_num_agents)): #adding agents of other team
         terrain[3, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+2]*1 # 1 if agent alive
-        terrain[5, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+3] 
-        terrain[7, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+4]
+        if not partial_obs:
+            terrain[5, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+3] 
+            terrain[7, obs[0]+obs[5*i], obs[1]+obs[5*i+1]] = obs[5*i+4]
     
     
     return terrain
