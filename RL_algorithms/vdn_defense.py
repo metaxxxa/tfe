@@ -28,7 +28,7 @@ TERRAIN = 'benchmark_10x10_1v1'
 
 MODEL_DIR = 'defense_params_vdn'
 RUN_NAME = 'benchmarking'
-ADVERSARY_TACTIC = 'random'
+
 ENV_SIZE = 10 #todo : calculate 
 
 
@@ -92,9 +92,8 @@ def main(argv):
     env = defense_v0.env(terrain=TERRAIN, max_cycles=constants.EPISODE_MAX_LENGTH, max_distance=constants.MAX_DISTANCE )
     env.reset()
     args_runner = Args(env)
-    args_runner.MODEL_DIR = MODEL_DIR
-    args_runner.RUN_NAME = RUN_NAME
-    args_runner.ADVERSARY_TACTIC = ADVERSARY_TACTIC
+    
+    
     
     try:
         opts, args = getopt.getopt(argv,"ha:l:e:",["load_adversary","load_model=","eval_model="])

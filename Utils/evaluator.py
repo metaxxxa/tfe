@@ -16,6 +16,8 @@ dev = "cpu"  #if cpu faster than gpu
 
 #importing RL algorithm
 from RL_algorithms import dqn_defense as dqn
+from RL_algorithms import q_mix_defense as qmix
+from RL_algorithms import vdn_defense as vdn
 from RL_algorithms.dqn_defense import Params, Metrics #for the pickle to work in the algorithm's model loading
 
 
@@ -53,6 +55,16 @@ def test_model(algorithm, adversary_tactic, model_directory, environments_direct
             args.ADVERSARY_TACTIC = adversary_tactic
             args.TENSORBOARD = False
             runner = dqn.Runner(env, args)
+        elif algorithm == 'qmix':
+            args = qmix.Args(env)
+            args.ADVERSARY_TACTIC = adversary_tactic
+            args.TENSORBOARD = False
+            runner = qmix.Runner(env, args)
+        elif algorithm == 'vdn':
+            args = qmix.Args(env)
+            args.ADVERSARY_TACTIC = adversary_tactic
+            args.TENSORBOARD = False
+            runner = qmix.Runner(env, args)
 
         res = runner.eval(model_directory, nb_episodes, False, False)
         res.env = f'{filename[0:-4]}'

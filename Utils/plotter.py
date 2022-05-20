@@ -314,6 +314,11 @@ if __name__ == "__main__":
     names = ['Plain Conv DQN trained on training set', 'PER Conv DDQN trained on training set']
     plot_eval_folder([CE_plaindqnconvLines, CE_ddqn_conv_PERanneal_lines], 'figures/CE_conv', 'changing', 'res_comp_dqn_CE', 'convolutional DQN', names, 'interval', 50)
  
+
+    names = ['DQN fully observable', 'VDN fully observable', 'QMIX fully observable', 'DQN partially observable', 'VDN partially observable', 'QMIX partially observable']
+    plot_eval_folder([ddqn_conv_PERanneal_lines], 'figures/observability', 'changing', 'res_comp_observability', 'convolutional DQN', names, 'interval', 50)
+ 
+
     # plot_eval_folder(test, 'testfolderplot', 'benchmark10_1v1', 'firstjet')
     # qmixloss_benchmark = 'toplot/Apr12_16-18-44_qmix_log.json'
     # plot_tensorboard_log(qmixloss_benchmark, 'loss', 'QMIX', 'benchmark', 'benchmark/loss_qmix_benchmark')

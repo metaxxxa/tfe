@@ -74,7 +74,7 @@ class DQNArgs:
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
         self.ADVERSARY_TACTIC = 'random'
-        self.ADVERSARY_MODEL = ''
+        self.ADVERSARY_MODEL = 'results/plaindqnconv/102226mai2022step_300000'
         self.PARTIALLY_OBSERVABLE = False
         self.params(env)
 
@@ -175,6 +175,7 @@ class QMIXArgs:
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
         self.ADVERSARY_TACTIC = 'random'
+        self.ADVERSARY_MODEL = 'results/plaindqnconv/102226mai2022step_300000'
         self.PARTIALLY_OBSERVABLE = False
         self.params(env)
 
@@ -273,7 +274,8 @@ class VDNArgs:
         self.LOSING_REWARD = -1
         self.TEAM_TO_TRAIN = 'blue'
         self.OPPOSING_TEAM = 'red'
-        self.ADVERSARY_TACTIC = 'random'
+        self.ADVERSARY_TACTIC = 'dqn'
+        self.ADVERSARY_MODEL = 'results/plaindqnconv/102226mai2022step_300000'
         self.PARTIALLY_OBSERVABLE = False
         self.params(env)
 

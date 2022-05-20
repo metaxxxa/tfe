@@ -29,6 +29,7 @@ from Utils.params import DQNArgs as Args
 
 
 
+
 device = get_device() #get cuda if available
 #environment constants
 constants = Constants()
@@ -36,7 +37,7 @@ TERRAIN = 'benchmark_10x10_1v1'
 TERRAIN_SIZE = 10
 MODEL_DIR = 'defense_params_dqn'
 RUN_NAME = 'benchmarking2'
-ADVERSARY_TACTIC = 'random'
+ADVERSARY_TACTIC = 'dqn'
 ENV_SIZE = 10 #todo : calculate for dqn class
 
 class DQN(nn.Module):
@@ -660,7 +661,7 @@ def main(argv):
     args_runner = Args(env)
     args_runner.MODEL_DIR = MODEL_DIR
     args_runner.RUN_NAME = RUN_NAME
-    args_runner.ADVERSARY_TACTIC = ADVERSARY_TACTIC
+    #args_runner.ADVERSARY_TACTIC = ADVERSARY_TACTIC
     
     try:
         opts, args = getopt.getopt(argv,"ha:l:e:",["load_adversary","load_model=","eval_model="])

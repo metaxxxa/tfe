@@ -20,7 +20,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(BASE_DIR)
 sys.path.insert(0, BASE_DIR)
 from env import defense_v0
-
+from RL_algorithms import dqn_defense 
 from Utils import helper
 from Utils.helper import Buffers, Params, Metrics, Constants, mask_array, get_device
 constants = Constants()
@@ -71,7 +71,11 @@ class Runner:
             #                 , torch.empty((self.args.BATCH_SIZE,self.args.n_blue_agents), device=device)))
         self.sync_networks()
         
-        
+        if self.args.ADVERSARY_TACTIC == 'dqn':
+            self.adversary_nets = {}
+            for agent in self.args.red_agents:
+                self.adversary_nets[agent] = dqn_defense.DQN(self.env, self.args, self.env.observation_space(agent).spaces['obs'].shape, self.env.action_space(agent).n)
+            self.load_model(self.args.ADVERSARY_MODEL, True)
         #self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', verbose=True, patience =15000)  #patience, min lr... Parameters still to find
     
     def change_terrain(self):
@@ -232,6 +236,8 @@ class Runner:
             return self.random_action(agent, obs)
         elif   self.args.ADVERSARY_TACTIC == 'passive':
             return 0
+        elif   self.args.ADVERSARY_TACTIC == 'dqn':
+            return self.adversary_nets[agent].act(obs)
         elif self.args.ADVERSARY_TACTIC == 'qmix':
             action, self.opposing_team_buffers.hidden_state[agent] = self.adversary_net.act(agent, obs, self.opposing_team_buffers.hidden_state[agent])
             return action
@@ -281,16 +287,10 @@ class Runner:
         target_model = dir + '/qmix_target_net_params.pt'
         
         if red:
-            self.adversary_net.load_state_dict(torch.load(mixer_model))
-            if self.args.COMMON_AGENTS_NETWORK:
-                agent_model = dir + '/agents_net_params.pt'
-                self.adversary_net.agents_net.load_state_dict(torch.load(agent_model))
-                for agent in self.args.blue_agents:
-                    self.agents_nets[agent] = self.agents_net
-            else:
-                for agent in self.args.red_agents:
-                    agent_model = dir + '/agent_nets_params/' + agent +'.pt'
-                    self.adversary_net.agents_nets[agent].load_state_dict(torch.load(agent_model))
+            for index in range(len(self.args.blue_agents)):
+                agent_model = dir + '/agent_dqn_params/' + self.args.blue_agents[index] +'.pt'
+                target_model = dir + '/agent_dqn_params/' + 'target_' + self.args.blue_agents[index] +'.pt'
+                self.adversary_nets[self.args.red_agents[index]].net.load_state_dict(torch.load(agent_model))
             with open(f'{dir}/loading_parameters.bin',"rb") as f:
                 self.loading_parameters = pickle.load(f)
             self.opposing_team_buffers.replay_buffer = self.loading_parameters.blue_team_replay_buffer
